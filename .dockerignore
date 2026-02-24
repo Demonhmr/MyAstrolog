@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+test_chart*.png
+_debug.json
+.git/
+*.md

@@ -1,0 +1,18 @@
+services:
+  bot:
+    build: .
+    container_name: myastro_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Кэш шрифтов matplotlib — без него первый рендер занимает 30-60 сек при каждом рестарте
+      - matplotlib_cache:/root/.cache/matplotlib
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  matplotlib_cache:
