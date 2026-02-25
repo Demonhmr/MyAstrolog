@@ -104,62 +104,93 @@ _debug.json
 
 ## Деплой на VPS (пошагово)
 
-### 1. Подготовка сервера
+> [!IMPORTANT]
+> **VPS для этого проекта:** `85.198.99.41` · `root` · пароль: см. у владельца
+> **Репо:** https://github.com/Demonhmr/MyAstrologV2
+
+### 1. Подключись к серверу
 
 ```bash
-# Обновление системы
-sudo apt update && sudo apt upgrade -y
+# Через PowerShell / терминал Windows:
+ssh root@85.198.99.41
+# Введи пароль вручную
+```
 
-# Установка Docker
+Или открой **PuTTY**: Host `85.198.99.41`, Port `22`.
+
+---
+
+### 2. Установи Docker (если не установлен)
+
+```bash
+# Проверь:
+docker --version 2>/dev/null || echo "НЕТ — нужно установить"
+
+# Если нет:
 curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-newgrp docker
-
-# Проверка
-docker --version
-docker compose version
+systemctl enable docker
+systemctl start docker
 ```
 
-### 2. Загрузка кода на сервер
+---
 
-Вариант А — через Git:
-```bash
-git clone https://github.com/YOUR_USER/myastro_bot.git
-cd myastro_bot/my_astro_bot
-```
-
-Вариант Б — через SCP (скопировать папку с Windows):
-```powershell
-# Запускать на Windows:
-scp -r C:\Users\DemonHMR\MyAstro\my_astro_bot user@YOUR_VPS_IP:/home/user/myastro_bot
-```
-
-### 3. Настройка окружения
+### 3. Клонируй репо
 
 ```bash
-cd /home/user/myastro_bot
-cp .env.example .env
-nano .env          # вставить реальный BOT_TOKEN
+cd /opt
+git clone https://github.com/Demonhmr/MyAstrologV2.git
+cd MyAstrologV2
 ```
 
-### 4. Сборка и запуск
+---
+
+### 4. Создай `.env` с токеном боta
 
 ```bash
+cat > my_astro_bot/.env << 'EOF'
+BOT_TOKEN=ВАШ_ТОКЕН_ЗДЕСЬ
+EOF
+```
+
+> [!CAUTION]
+> Не коммить `.env` в Git — он уже добавлен в `.gitignore`.
+
+---
+
+### 5. Запусти через Docker Compose
+
+```bash
+cd /opt/MyAstrologV2
 docker compose up -d --build
 ```
 
-### 5. Проверка
+Первая сборка занимает ~2-5 минут (скачивает Python, устанавливает зависимости).
+
+---
+
+### 6. Проверь что работает
 
 ```bash
 # Логи в реальном времени
-docker compose logs -f
+docker compose logs -f --tail=30
 
-# Статус контейнера
-docker compose ps
+# Ожидаемый результат:
+# [INFO] aiogram.dispatcher: Run polling for bot @MyAstro_v1_bot
+```
 
-# Результат должен быть:
-# myastro_bot   Up   ...
-# INFO:aiogram.dispatcher:Run polling for bot @MyAstro_v1_bot
+---
+
+### Управление контейнером
+
+```bash
+docker compose ps              # статус
+docker compose logs -f         # логи
+docker compose restart         # перезапуск
+docker compose down            # остановить
+
+# Обновить код:
+git pull
+docker compose up -d --build
 ```
 
 ---
