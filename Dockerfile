@@ -15,11 +15,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 # --- Python зависимости (отдельный слой для кэширования) ---
-COPY requirements.txt .
+COPY my_astro_bot/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # --- Исходный код ---
-COPY . .
+COPY my_astro_bot/ .
 
 # Matplotlib non-interactive backend
 ENV MPLBACKEND=Agg
