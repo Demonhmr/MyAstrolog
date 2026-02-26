@@ -13,14 +13,13 @@ _VALID_PLACE_TYPES = {
 }
 
 
-def geocode_city(city_name: str) -> dict:
+def geocode_city(city_name: str, date_context: datetime = None) -> dict:
     """
     Resolve city name to coordinates and timezone.
+    Calculates UTC offset for the date_context moment if provided.
 
     Returns:
         dict with keys: lat, lon, timezone_name, utc_offset_hours, display_name
-    Raises:
-        ValueError if city not found or result is not a populated place.
     """
     geolocator = Nominatim(user_agent="my_astro_bot_v2")
     location = geolocator.geocode(
@@ -58,7 +57,20 @@ def geocode_city(city_name: str) -> dict:
     tf = TimezoneFinder()
     tz_name = tf.timezone_at(lat=lat, lng=lon) or "UTC"
     tz = pytz.timezone(tz_name)
-    utc_offset = datetime.now(tz).utcoffset().total_seconds() / 3600
+
+    # Use provided date_context to calculate historical/correct offset
+    ref_dt = date_context or datetime.now()
+    try:
+        if ref_dt.tzinfo is None:
+            # We assume the user entered LOCAL time for the given city
+            # localize handles historical DST/offset shifts
+            localized_dt = tz.localize(ref_dt, is_dst=None)
+            utc_offset = localized_dt.utcoffset().total_seconds() / 3600
+        else:
+            utc_offset = ref_dt.astimezone(tz).utcoffset().total_seconds() / 3600
+    except Exception:
+        # Fallback to current offset if localization fails
+        utc_offset = datetime.now(tz).utcoffset().total_seconds() / 3600
 
     return {
         "lat":              lat,

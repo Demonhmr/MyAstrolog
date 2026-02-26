@@ -16,14 +16,7 @@ class AstrologyEngine:
 
     def get_lunar_return(self, name, year, month, day, hour, minute, lat, lon, utc_offset):
         """
-        Calculates the Lunar Return chart observer for the current cycle.
-
-        Args:
-            lat: Latitude in degrees (e.g. 55.75)
-            lon: Longitude in degrees (e.g. 37.61)
-            utc_offset: UTC offset in hours (e.g. 3.0 for MSK)
-        Returns:
-            ephem.Observer positioned at the moment of Lunar Return
+        Calculates the Lunar Return chart observer and cycle dates.
         """
         # 1. Calculate Natal Moon Position
         natal_date = datetime(year, month, day, hour, minute)
@@ -38,14 +31,35 @@ class AstrologyEngine:
         natal_ecl = ephem.Ecliptic(moon)
         natal_lon_rad = natal_ecl.lon
 
-        # 2. Find return date — search ±14 days around today (covers full ~27.3d cycle)
+        # 2. Find return date — search ±14 days around today
         now_utc = datetime.utcnow()
         start_search = now_utc - timedelta(days=14)
 
-        current_date_utc = start_search
-        found_date_utc = None
+        found_date_utc = self._find_next_return(observer, moon, natal_lon_rad, start_search)
 
-        for _ in range(42 * 24):  # every hour over 42 days
+        if not found_date_utc:
+            logging.warning("Lunar return not found, using current UTC")
+            found_date_utc = now_utc
+
+        # 3. Find end date (next return)
+        # Search starting from 25 days after the found date
+        end_date_search = found_date_utc + timedelta(days=25)
+        end_date_utc = self._find_next_return(observer, moon, natal_lon_rad, end_date_search)
+
+        if not end_date_utc:
+            end_date_utc = found_date_utc + timedelta(days=27, hours=8) # Fallback
+
+        observer.date = found_date_utc
+        return {
+            "observer": observer,
+            "start_date": found_date_utc,
+            "end_date": end_date_utc
+        }
+
+    def _find_next_return(self, observer, moon, natal_lon_rad, start_from_utc):
+        current_date_utc = start_from_utc
+        # Search for 42 days (covers more than a full cycle)
+        for _ in range(42 * 24):
             observer.date = current_date_utc
             moon.compute(observer)
             curr_ecl = ephem.Ecliptic(moon)
@@ -55,20 +69,10 @@ class AstrologyEngine:
                 diff = 2 * math.pi - diff
 
             if diff < 0.01:  # ~0.57°
-                found_date_utc = current_date_utc
-                break
+                return current_date_utc
 
             current_date_utc += timedelta(hours=1)
-
-        if not found_date_utc:
-            logging.warning(
-                "Lunar return not found in ±14-day window, using current UTC time as fallback"
-            )
-            found_date_utc = now_utc
-
-        # 3. Set observer to the return moment
-        observer.date = found_date_utc
-        return observer
+        return None
 
     def get_planets_data(self, observer):
         """

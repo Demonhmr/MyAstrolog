@@ -10,6 +10,7 @@ import logging
 import os
 from datetime import datetime
 from functools import partial
+import pytz
 
 from aiogram import Router, types, F
 from aiogram.filters import Command, StateFilter
@@ -41,8 +42,7 @@ class RegistrationStates(StatesGroup):
     waiting_for_name       = State()
     waiting_for_birth_date = State()
     waiting_for_birth_time = State()
-    waiting_for_birth_city = State()   # V2: separate city of birth
-    waiting_for_location   = State()   # V2: current city
+    waiting_for_birth_city = State()
 
 
 # ── /forecast command (legacy entry) ─────────────────────────────────────────
@@ -105,9 +105,17 @@ async def process_birth_time(message: types.Message, state: FSMContext):
 
 @router.message(RegistrationStates.waiting_for_birth_city)
 async def process_birth_city(message: types.Message, state: FSMContext):
-    city_input = message.text.strip()
+    # Parse birth date/time to get context for UTC offset (DST correction)
+    user_data = await state.get_data()
     try:
-        geo = geocode_city(city_input)
+        d, m, y = map(int, user_data["birth_date"].split("."))
+        hh, mm = map(int, user_data["birth_time"].split(":"))
+        dt_context = datetime(y, m, d, hh, mm)
+    except Exception:
+        dt_context = None
+
+    try:
+        geo = geocode_city(city_input, date_context=dt_context)
     except ValueError as e:
         await message.answer(str(e))
         return  # Stay in state, let user retry
@@ -120,40 +128,23 @@ async def process_birth_city(message: types.Message, state: FSMContext):
         birth_utc_offset=geo["utc_offset_hours"],
         birth_tz=geo["timezone_name"],
     )
-    await message.answer(
-        f"📍 <b>Город рождения</b>: {html.escape(geo['display_name'][:60])}\n\n"
-        f"Теперь введи <b>текущий город</b> — здесь будет строиться прогноз:",
-        parse_mode="HTML",
-    )
-    await state.set_state(RegistrationStates.waiting_for_location)
+    
+    # Trigger calculation immediately using birth city
+    await perform_calculation(message, state)
 
 
 # ── Step 5: Current city → calculation ───────────────────────────────────────
 
-@router.message(RegistrationStates.waiting_for_location)
-async def process_location(message: types.Message, state: FSMContext):
+async def perform_calculation(message: types.Message, state: FSMContext):
     user_data = await state.get_data()
-    city_input = message.text.strip()
+    
+    cur_lat        = user_data["birth_lat"]
+    cur_lon        = user_data["birth_lon"]
+    cur_utc_offset = user_data["birth_utc_offset"]
+    cur_tz         = user_data["birth_tz"]
+    city_display   = user_data["birth_city_display"]
 
-    # 1. Geocode current city
-    try:
-        geo = geocode_city(city_input)
-    except ValueError as e:
-        await message.answer(str(e))
-        return
-
-    cur_lat        = geo["lat"]
-    cur_lon        = geo["lon"]
-    cur_utc_offset = geo["utc_offset_hours"]
-    cur_tz         = geo["timezone_name"]
-    city_display   = geo["display_name"][:60]
-
-    # Birth data
-    birth_lat        = user_data["birth_lat"]
-    birth_lon        = user_data["birth_lon"]
-    birth_utc_offset = user_data["birth_utc_offset"]
-
-    # 2. Summary
+    # Summary
     utc_sign = "+" if cur_utc_offset >= 0 else ""
     summary = (
         f"📋 <b>Данные для расчёта</b>\n"
@@ -161,9 +152,8 @@ async def process_location(message: types.Message, state: FSMContext):
         f"👤 Имя: <b>{user_data['name']}</b>\n"
         f"📅 Дата рождения: <b>{user_data['birth_date']}</b>\n"
         f"🕐 Время рождения: <b>{user_data['birth_time']}</b>\n"
-        f"🏠 Город рождения: <b>{html.escape(user_data.get('birth_city_display', user_data.get('birth_city','')))}</b>\n"
-        f"📍 Текущий город: <b>{html.escape(city_display)}</b>\n"
-        f"🕰 Часовой пояс: <b>{cur_tz} (UTC{utc_sign}{cur_utc_offset:.0f})</b>\n"
+        f"📍 Город: <b>{html.escape(city_display)}</b>\n"
+        f"🕰 Часовой пояс: <b>{cur_tz} (UTC{utc_sign}{cur_utc_offset:.1f})</b>\n"
         f"━━━━━━━━━━━━━━━━━━━━\n"
         f"⏳ Начинаю расчёт прогноза..."
     )
@@ -179,12 +169,21 @@ async def process_location(message: types.Message, state: FSMContext):
         hh, mm    = map(int, user_data["birth_time"].split(":"))
 
         # Lunar Return: natal positions at birth_city, return moment at current_city
-        chart   = engine.get_lunar_return(
+        lunar_data = engine.get_lunar_return(
             user_data["name"], y, m, d, hh, mm,
             cur_lat, cur_lon, cur_utc_offset,
         )
+        chart = lunar_data["observer"]
         planets = engine.get_planets_data(chart)
         points  = engine.get_chart_points(chart)
+
+        # Dates of the cycle
+        start_dt = lunar_data["start_date"]
+        end_dt   = lunar_data["end_date"]
+        # Convert UTC to local city time for display
+        local_tz = pytz.timezone(cur_tz)
+        start_local = pytz.utc.localize(start_dt).astimezone(local_tz)
+        end_local   = pytz.utc.localize(end_dt).astimezone(local_tz)
 
         # Scores & dominants
         sign_scores, house_scores = calc.calculate_scores(planets)
@@ -215,6 +214,8 @@ async def process_location(message: types.Message, state: FSMContext):
 
         calc_msg = (
             f"🔢 <b>Данные расчёта (Лунарный возврат)</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"📅 <b>Цикл:</b> {start_local.strftime('%d.%m.%Y %H:%M')} — {end_local.strftime('%d.%m.%Y %H:%M')}\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
             f"🪐 <b>Позиции планет:</b>\n{planets_text}\n\n"
             f"📊 <b>Очки по знакам:</b>\n"

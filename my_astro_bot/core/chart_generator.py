@@ -92,8 +92,8 @@ def generate_chart_png(
     asc_deg      = asc_sign_idx * 30.0
 
     # ── Figure ───────────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 10), facecolor="#0d0d1a")
-    ax.set_facecolor("#0d0d1a")
+    fig, ax = plt.subplots(figsize=(10, 10), facecolor="#ffffff")
+    ax.set_facecolor("#ffffff")
     ax.set_aspect("equal")
     ax.set_xlim(-1.65, 1.65)
     ax.set_ylim(-1.65, 1.65)
@@ -120,8 +120,8 @@ def generate_chart_png(
             (0, 0), R_OUTER,
             theta1=start_a, theta2=end_a,
             width=R_OUTER - R_ZODIAC_IN,
-            facecolor=color, alpha=0.16,
-            edgecolor="#ffffff", linewidth=0.4, zorder=2,
+            facecolor=color, alpha=0.12,
+            edgecolor="#999999", linewidth=0.4, zorder=2,
         ))
 
         mid_theta = _lon_to_angle(start_lon + 15.0, asc_deg)
@@ -131,11 +131,11 @@ def generate_chart_png(
                 fontsize=14, color=color, alpha=0.95, zorder=5)
 
     # ── Circles ───────────────────────────────────────────────────────────────
-    for r, lw, alpha in [(R_OUTER, 1.5, 0.6), (R_ZODIAC_IN, 0.8, 0.4), (R_HOUSE_IN, 0.8, 0.3)]:
-        ax.add_patch(plt.Circle((0, 0), r, color="white", fill=False,
+    for r, lw, alpha in [(R_OUTER, 1.5, 0.4), (R_ZODIAC_IN, 0.8, 0.3), (R_HOUSE_IN, 0.8, 0.2)]:
+        ax.add_patch(plt.Circle((0, 0), r, color="#222222", fill=False,
                                 linewidth=lw, alpha=alpha, zorder=3))
 
-    ax.add_patch(plt.Circle((0, 0), R_ASPECT - 0.01, color="#0d0d1a", fill=True, zorder=4))
+    ax.add_patch(plt.Circle((0, 0), R_ASPECT - 0.01, color="#fefefe", fill=True, zorder=4))
 
     # ── House lines ───────────────────────────────────────────────────────────
     axis_labels = {0: "ASC", 3: "IC", 6: "DSC", 9: "MC"}
@@ -146,18 +146,18 @@ def generate_chart_png(
         x_in,  y_in  = _polar(R_HOUSE_IN,  theta)
         is_major = (i % 3 == 0)
         ax.plot([x_in, x_out], [y_in, y_out],
-                color="#ffffff" if is_major else "#445566",
+                color="#000000" if is_major else "#999999",
                 linewidth=1.2 if is_major else 0.5,
-                alpha=0.8 if is_major else 0.4, zorder=3)
+                alpha=0.6 if is_major else 0.3, zorder=3)
         if is_major and i in axis_labels:
             lx, ly = _polar(R_HOUSE_OUT + 0.07, theta)
             ax.text(lx, ly, axis_labels[i], ha="center", va="center",
-                    fontsize=8, color="#aaaacc", fontweight="bold", alpha=0.85, zorder=6)
+                    fontsize=8, color="#333333", fontweight="bold", alpha=0.85, zorder=6)
         elif not is_major:
             num_theta = _lon_to_angle(lon_h + 15.0, asc_deg)
             nx, ny = _polar((R_HOUSE_OUT + R_HOUSE_IN) / 2, num_theta)
             ax.text(nx, ny, str(i + 1), ha="center", va="center",
-                    fontsize=6.5, color="#8888aa", alpha=0.7, zorder=5)
+                    fontsize=6.5, color="#666666", alpha=0.7, zorder=5)
 
     # ── Aspects ───────────────────────────────────────────────────────────────
     for i, p1 in enumerate(planets):
@@ -174,8 +174,8 @@ def generate_chart_png(
                         color=asp["color"], linestyle=asp["ls"],
                         linewidth=0.8, alpha=asp["alpha"], zorder=5)
 
-    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#0d0d1a", fill=True, zorder=8))
-    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#4444aa", fill=False,
+    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#ffffff", fill=True, zorder=8))
+    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#9999bb", fill=False,
                             linewidth=0.8, alpha=0.5, zorder=8))
 
     # ── Planets ───────────────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ def generate_chart_png(
         dot_x, dot_y = _polar(R_ZODIAC_IN - 0.03, theta)
         ax.plot(dot_x, dot_y, "o", markersize=3, color=color, alpha=0.9, zorder=7)
         ax.plot([dot_x, px], [dot_y, py], "-", color=color, linewidth=0.5, alpha=0.35, zorder=6)
-        ax.add_patch(plt.Circle((px, py), 0.058, color="#0d0d1a", fill=True, zorder=9))
+        ax.add_patch(plt.Circle((px, py), 0.058, color="#ffffff", fill=True, zorder=9))
         ax.text(px, py, symbol, ha="center", va="center",
                 fontsize=13, color=color, fontweight="bold", zorder=10)
 
@@ -212,14 +212,14 @@ def generate_chart_png(
                     fontsize=7, color="#e74c3c", alpha=0.9, zorder=10)
 
     # ── Center info ───────────────────────────────────────────────────────────
-    ax.text(0,  0.10, name,       ha="center", va="center", fontsize=10, color="#ccccee", fontweight="bold", zorder=11)
-    ax.text(0,  0.00, birth_date, ha="center", va="center", fontsize=8,  color="#9999bb", zorder=11)
-    ax.text(0, -0.09, birth_time, ha="center", va="center", fontsize=7,  color="#7777aa", zorder=11)
-    ax.text(0, -0.18, city,       ha="center", va="center", fontsize=6,  color="#666688", zorder=11)
+    ax.text(0,  0.10, name,       ha="center", va="center", fontsize=10, color="#222222", fontweight="bold", zorder=11)
+    ax.text(0,  0.00, birth_date, ha="center", va="center", fontsize=8,  color="#444444", zorder=11)
+    ax.text(0, -0.09, birth_time, ha="center", va="center", fontsize=7,  color="#666666", zorder=11)
+    ax.text(0, -0.18, city,       ha="center", va="center", fontsize=6,  color="#777777", zorder=11)
 
     # ── Title ─────────────────────────────────────────────────────────────────
     ax.text(0, -1.58, chart_title, ha="center", va="center",
-            fontsize=11, color="#aaaacc", fontstyle="italic", zorder=11)
+            fontsize=11, color="#333333", fontstyle="italic", zorder=11)
 
     # ── Planet legend ─────────────────────────────────────────────────────────
     legend_y   = 1.53
@@ -230,7 +230,7 @@ def generate_chart_png(
         lx    = -0.95 + j * step
         label = (sym + "℞") if p.get("is_retro") else sym
         ax.text(lx, legend_y,        label,           ha="center", va="center", fontsize=9,   color=col,       zorder=11)
-        ax.text(lx, legend_y - 0.10, p["name"][:3],  ha="center", va="center", fontsize=5.5, color="#666688", zorder=11)
+        ax.text(lx, legend_y - 0.10, p["name"][:3],  ha="center", va="center", fontsize=5.5, color="#444444", zorder=11)
 
     # ── Aspect legend ─────────────────────────────────────────────────────────
     asp_legend = [("☌", "#f1c40f"), ("☍", "#e74c3c"), ("△", "#2ecc71"),
@@ -239,12 +239,12 @@ def generate_chart_png(
     for k, ((sym, col), nm) in enumerate(zip(asp_legend, asp_names)):
         lx = -0.80 + k * 0.40
         ax.text(lx, -1.44, sym, ha="center", va="center", fontsize=10, color=col,       zorder=11)
-        ax.text(lx, -1.53, nm,  ha="center", va="center", fontsize=5,  color="#666688", zorder=11)
+        ax.text(lx, -1.53, nm,  ha="center", va="center", fontsize=5,  color="#444444", zorder=11)
 
     # ── Export ────────────────────────────────────────────────────────────────
     buf = io.BytesIO()
     plt.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                facecolor="#0d0d1a", edgecolor="none")
+                facecolor="#ffffff", edgecolor="none")
     plt.close(fig)
     buf.seek(0)
     return buf.read()
