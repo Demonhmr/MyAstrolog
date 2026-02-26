@@ -105,6 +105,7 @@ async def process_birth_time(message: types.Message, state: FSMContext):
 
 @router.message(RegistrationStates.waiting_for_birth_city)
 async def process_birth_city(message: types.Message, state: FSMContext):
+    city_input = message.text.strip()
     # Parse birth date/time to get context for UTC offset (DST correction)
     user_data = await state.get_data()
     try:
