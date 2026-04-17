@@ -89,7 +89,8 @@ def generate_chart_png(
 
     asc_sign_en  = chart_points.get("ascendant", "Aries")
     asc_sign_idx = SIGN_NAMES_EN.index(asc_sign_en) if asc_sign_en in SIGN_NAMES_EN else 0
-    asc_deg      = asc_sign_idx * 30.0
+    # FIX #5: Use exact degree if provided; fall back to sign boundary (0°, 30°, ...) only if missing
+    asc_deg = chart_points.get("ascendant_deg", asc_sign_idx * 30.0)
 
     # ── Figure ───────────────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(10, 10), facecolor="#ffffff")

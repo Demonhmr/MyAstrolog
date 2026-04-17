@@ -64,12 +64,21 @@ def geocode_city(city_name: str, date_context: datetime = None) -> dict:
         if ref_dt.tzinfo is None:
             # We assume the user entered LOCAL time for the given city
             # localize handles historical DST/offset shifts
-            localized_dt = tz.localize(ref_dt, is_dst=None)
+            try:
+                localized_dt = tz.localize(ref_dt, is_dst=None)
+            except pytz.exceptions.AmbiguousTimeError:
+                # Clock was turned back: two valid offsets exist. Choose DST=True (summer) as safer.
+                logging.warning(
+                    f"AmbiguousTimeError for {ref_dt} in {tz_name} "
+                    f"(clock change overlap). Using DST=True (summer offset)."
+                )
+                localized_dt = tz.localize(ref_dt, is_dst=True)
             utc_offset = localized_dt.utcoffset().total_seconds() / 3600
         else:
             utc_offset = ref_dt.astimezone(tz).utcoffset().total_seconds() / 3600
-    except Exception:
-        # Fallback to current offset if localization fails
+    except Exception as e:
+        # Fallback to current offset if localization fails for any other reason
+        logging.warning(f"UTC offset localization failed for {ref_dt} in {tz_name}: {e}. Using current offset.")
         utc_offset = datetime.now(tz).utcoffset().total_seconds() / 3600
 
     return {

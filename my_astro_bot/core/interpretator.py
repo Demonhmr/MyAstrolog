@@ -69,8 +69,8 @@ class ReportInterpretator:
         """Generate HTML forecast report for Telegram (≤4096 chars)."""
         synth_sign_ru = self._translate_sign(synth_sign) if synth_sign else "Неопределён"
 
-        inner_text = self.data["signs"].get(synth_sign_ru, "") or \
-                     self.data["signs"].get(synth_sign, "Описание отсутствует")
+        # FIX #4: JSON uses English keys ("Aries", not "Овен"), look up directly
+        inner_text = self.data["signs"].get(synth_sign, "Описание отсутствует")
         outer_text = self.data["houses"].get(str(synth_house), "Описание отсутствует")
 
         inner_clean = self._sanitize(inner_text)

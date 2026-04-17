@@ -174,7 +174,7 @@ async def perform_calculation(message: types.Message, state: FSMContext):
             user_data["name"], y, m, d, hh, mm,
             cur_lat, cur_lon, cur_utc_offset,
         )
-        chart = lunar_data["observer"]
+        chart = lunar_data["chart_data"]
         planets = engine.get_planets_data(chart)
         points  = engine.get_chart_points(chart)
 
