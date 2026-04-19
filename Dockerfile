@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender1 \
     gcc \
+    g++ \
     python3-dev \
     libc6-dev \
     && rm -rf /var/lib/apt/lists/*
