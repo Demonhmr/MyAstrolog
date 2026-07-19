@@ -22,6 +22,8 @@ Telegram-бот для составления персонального аст�
 | Карты | matplotlib (Agg, OO API) |
 | Деплой | Docker + docker-compose |
 
+📖 **Подробная инструкция по запуску (VPS, разработка, обновление, проблемы): [docs/SETUP.md](docs/SETUP.md)**
+
 ## Запуск локально
 
 ```bash
