@@ -48,7 +48,7 @@ my_astro_bot/
 **`requirements.txt`:**
 ```
 aiogram==3.17.0
-ephem==4.1.6
+pyswisseph>=2.10.3
 geopy>=2.4.0
 timezonefinder>=6.2.0
 pydantic==2.10.6

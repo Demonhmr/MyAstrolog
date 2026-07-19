@@ -106,7 +106,7 @@ _debug.json
 
 > [!IMPORTANT]
 > **VPS для этого проекта:** `85.198.99.41` · `root` · пароль: см. у владельца
-> **Репо:** https://github.com/Demonhmr/MyAstrologV2
+> **Репо:** https://github.com/Demonhmr/MyAstrolog
 
 ### 1. Подключись к серверу
 
@@ -138,8 +138,8 @@ systemctl start docker
 
 ```bash
 cd /opt
-git clone https://github.com/Demonhmr/MyAstrologV2.git
-cd MyAstrologV2
+git clone https://github.com/Demonhmr/MyAstrolog.git
+cd MyAstrolog
 ```
 
 ---
@@ -160,7 +160,7 @@ EOF
 ### 5. Запусти через Docker Compose
 
 ```bash
-cd /opt/MyAstrologV2
+cd /opt/MyAstrolog
 docker compose up -d --build
 ```
 

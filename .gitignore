@@ -1,0 +1,9 @@
+# Environment (BOT_TOKEN — никогда не коммитить)
+.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/

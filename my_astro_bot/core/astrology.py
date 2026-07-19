@@ -1,14 +1,29 @@
 """
-astrology.py — v3
+astrology.py — v4
 Lunar Return calculation with pyswisseph (Swiss Ephemeris).
 Geocentric calculations for planets, zero-crossing precision for return time.
+The returned cycle is the one CONTAINING today (last return before now).
 """
 
 import swisseph as swe
-import math
 import logging
-from datetime import datetime, timedelta
-import pytz
+from datetime import datetime, timedelta, timezone
+
+
+# Sign rulers (modern rulerships) — used for month dynamics per the methodology:
+# the house of the ASC ruler describes circumstances at the start of the month,
+# the house of the MC ruler — at its end.
+SIGN_RULERS = {
+    "Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury", "Cancer": "Moon",
+    "Leo": "Sun", "Virgo": "Mercury", "Libra": "Venus", "Scorpio": "Pluto",
+    "Sagittarius": "Jupiter", "Capricorn": "Saturn", "Aquarius": "Uranus",
+    "Pisces": "Neptune",
+}
+
+
+def utcnow_naive() -> datetime:
+    """Naive UTC now (internal JD conversions work with naive UTC datetimes)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AstrologyEngine:
@@ -42,33 +57,41 @@ class AstrologyEngine:
     def get_lunar_return(self, name, year, month, day, hour, minute, lat, lon, utc_offset):
         """
         Calculates the Lunar Return exactly using zero-crossing on moon longitude.
+
+        Returns the cycle CONTAINING today: the most recent return before now
+        (so the forecast always describes the currently active lunar month),
+        with the end date at the next return.
         """
         # 1. Calculate Natal Moon Position
         natal_date = datetime(year, month, day, hour, minute)
         natal_utc = natal_date - timedelta(hours=utc_offset)
-        
+
         jd_natal = self._datetime_to_jd(natal_utc)
         natal_moon, _ = swe.calc_ut(jd_natal, swe.MOON)
         natal_lon = natal_moon[0]
 
-        # 2. Find return date — search ±14 days around today
-        now_utc = datetime.utcnow()
-        start_search_utc = now_utc - timedelta(days=14)
-        
-        start_jd = self._datetime_to_jd(start_search_utc)
+        # 2. Find the last return BEFORE now. A 28-day back-window always
+        # contains 1–2 crossings (lunar cycle ≈ 27.32 days); take the latest
+        # one that is still in the past.
+        now_utc = utcnow_naive()
+        now_jd = self._datetime_to_jd(now_utc)
+        start_jd = self._datetime_to_jd(now_utc - timedelta(days=28))
+
         found_jd = self._find_next_return(start_jd, natal_lon)
+        if found_jd:
+            second_jd = self._find_next_return(found_jd + 25.0, natal_lon)
+            if second_jd and second_jd <= now_jd:
+                found_jd = second_jd
 
         if not found_jd:
             logging.warning("Lunar return not found, using current UTC")
-            found_jd = self._datetime_to_jd(now_utc)
+            found_jd = now_jd
 
-        # 3. Find end date (next return)
-        # Search starting from 25 days after the found date
-        end_date_search_jd = found_jd + 25.0
-        end_jd = self._find_next_return(end_date_search_jd, natal_lon)
+        # 3. Find end date (next return), searching from 25 days after the start
+        end_jd = self._find_next_return(found_jd + 25.0, natal_lon)
 
         if not end_jd:
-            end_jd = found_jd + 27.321  # Fallback synodic/sidereal length
+            end_jd = found_jd + 27.321  # Fallback sidereal month length
 
         found_date_utc = self._jd_to_datetime(found_jd)
         end_date_utc = self._jd_to_datetime(end_jd)

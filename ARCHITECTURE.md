@@ -57,13 +57,11 @@ waiting_for_birth_time   (формат: HH:MM)
     ↓
 waiting_for_birth_city   (геокодинг города рождения)
     ↓
-waiting_for_location     (геокодинг текущего города)
-    ↓
-[process_location]       ← основная логика
+[perform_calculation]    ← основная логика
 ```
 
-**`process_location`** выполняет по порядку:
-1. Геокодинг текущего города
+**`perform_calculation`** выполняет по порядку:
+1. Геокодинг города рождения (в thread executor)
 2. Расчёт Лунарного возврата (`AstrologyEngine`)
 3. Расчёт доминант по знакам/домам (`AstroCalculator`)
 4. Отправка блока 🔢 данных расчёта
@@ -79,9 +77,9 @@ waiting_for_location     (геокодинг текущего города)
 **Метод `get_lunar_return(name, year, month, day, hour, minute, lat, lon, utc_offset)`**
 
 Алгоритм:
-1. Вычисляет натальное положение Луны (ephem.Moon)
+1. Вычисляет натальное положение Луны (swe.calc_ut, Swiss Ephemeris)
 2. Итеративным поиском находит момент, когда Луна возвращается в ту же эклиптическую долготу
-3. Формирует `ephem.Observer` для момента Лунарного возврата
+3. Формирует chart_data (JD + координаты) для момента Лунарного возврата
 4. Вызывает `get_planets_data(observer)` → список планет
 
 **Метод `get_planets_data(observer)`** — для каждой из 10 планет:
@@ -147,9 +145,9 @@ waiting_for_location     (геокодинг текущего города)
 
 ```mermaid
 graph TD
-    U["👤 Пользователь"] --> |"имя, ДР, время, 2 города"| FSM
+    U["👤 Пользователь"] --> |"имя, ДР, время, город рождения"| FSM
     FSM --> GEO["geocoder.py\nNominatim + TimezoneFinder"]
-    GEO --> |"lat, lon, tz"| AE["astrology.py\nAstrologyEngine\nephem"]
+    GEO --> |"lat, lon, tz"| AE["astrology.py\nAstrologyEngine\npyswisseph"]
     AE --> |"observer"| PD["Позиции 10 планет\nзнак, дом, lon_deg, is_retro"]
     PD --> CALC["calculator.py\nОчки элементов/крестов\nДоминанты, синт. знак"]
     PD --> CG["chart_generator.py\nmatplotlib → PNG"]
@@ -168,7 +166,6 @@ class RegistrationStates(StatesGroup):
     waiting_for_birth_date  = State()
     waiting_for_birth_time  = State()
     waiting_for_birth_city  = State()
-    waiting_for_location    = State()
 ```
 
 Хранилище: **MemoryStorage** (в памяти, сбрасывается при перезапуске).
@@ -181,7 +178,7 @@ class RegistrationStates(StatesGroup):
 ### Python (requirements.txt)
 ```
 aiogram==3.17.0            # Telegram Bot API
-ephem==4.1.6               # Астрономические расчёты (ephemeris)
+pyswisseph>=2.10.3         # Астрономические расчёты (Swiss Ephemeris)
 geopy>=2.4.0               # Геокодинг (Nominatim)
 timezonefinder>=6.2.0      # Определение часового пояса (offline)
 pydantic==2.10.6           # Валидация данных

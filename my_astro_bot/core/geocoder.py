@@ -1,16 +1,30 @@
 """
-geocoder.py — v2
+geocoder.py — v3
 City name → lat/lon/timezone via Nominatim (OSM) + TimezoneFinder (offline).
+
+geocode_city is synchronous (network call) — call it via run_in_executor
+from async handlers so it doesn't block the event loop.
 """
 
+import logging
 from datetime import datetime
+
 from geopy.geocoders import Nominatim
+from geopy.exc import GeopyError
 from timezonefinder import TimezoneFinder
 import pytz
+
+logger = logging.getLogger(__name__)
 
 _VALID_PLACE_TYPES = {
     "city", "town", "village", "municipality", "hamlet", "suburb", "borough"
 }
+
+# Module-level singletons: TimezoneFinder loads its offline polygon DB on init
+# (slow, memory-heavy) and Nominatim needs a stable user_agent — never
+# re-create these per request.
+_geolocator = Nominatim(user_agent="my_astro_bot_v2", timeout=5)
+_tf = TimezoneFinder()
 
 
 def geocode_city(city_name: str, date_context: datetime = None) -> dict:
@@ -18,16 +32,24 @@ def geocode_city(city_name: str, date_context: datetime = None) -> dict:
     Resolve city name to coordinates and timezone.
     Calculates UTC offset for the date_context moment if provided.
 
+    Raises ValueError with a user-friendly message on any failure.
+
     Returns:
         dict with keys: lat, lon, timezone_name, utc_offset_hours, display_name
     """
-    geolocator = Nominatim(user_agent="my_astro_bot_v2")
-    location = geolocator.geocode(
-        city_name,
-        addressdetails=True,
-        language="ru",
-        exactly_one=True,
-    )
+    try:
+        location = _geolocator.geocode(
+            city_name,
+            addressdetails=True,
+            language="ru",
+            exactly_one=True,
+        )
+    except GeopyError as e:
+        logger.warning(f"Geocoding service error for {city_name!r}: {e}")
+        raise ValueError(
+            "Сервис геокодинга временно недоступен. "
+            "Подожди минуту и отправь название города ещё раз."
+        )
 
     if not location:
         raise ValueError(
@@ -54,8 +76,7 @@ def geocode_city(city_name: str, date_context: datetime = None) -> dict:
     lat = location.latitude
     lon = location.longitude
 
-    tf = TimezoneFinder()
-    tz_name = tf.timezone_at(lat=lat, lng=lon) or "UTC"
+    tz_name = _tf.timezone_at(lat=lat, lng=lon) or "UTC"
     tz = pytz.timezone(tz_name)
 
     # Use provided date_context to calculate historical/correct offset
@@ -68,9 +89,16 @@ def geocode_city(city_name: str, date_context: datetime = None) -> dict:
                 localized_dt = tz.localize(ref_dt, is_dst=None)
             except pytz.exceptions.AmbiguousTimeError:
                 # Clock was turned back: two valid offsets exist. Choose DST=True (summer) as safer.
-                logging.warning(
+                logger.warning(
                     f"AmbiguousTimeError for {ref_dt} in {tz_name} "
                     f"(clock change overlap). Using DST=True (summer offset)."
+                )
+                localized_dt = tz.localize(ref_dt, is_dst=True)
+            except pytz.exceptions.NonExistentTimeError:
+                # Clock was turned forward: this local time never existed. Use DST=True.
+                logger.warning(
+                    f"NonExistentTimeError for {ref_dt} in {tz_name} "
+                    f"(spring-forward gap). Using DST=True."
                 )
                 localized_dt = tz.localize(ref_dt, is_dst=True)
             utc_offset = localized_dt.utcoffset().total_seconds() / 3600
@@ -78,7 +106,7 @@ def geocode_city(city_name: str, date_context: datetime = None) -> dict:
             utc_offset = ref_dt.astimezone(tz).utcoffset().total_seconds() / 3600
     except Exception as e:
         # Fallback to current offset if localization fails for any other reason
-        logging.warning(f"UTC offset localization failed for {ref_dt} in {tz_name}: {e}. Using current offset.")
+        logger.warning(f"UTC offset localization failed for {ref_dt} in {tz_name}: {e}. Using current offset.")
         utc_offset = datetime.now(tz).utcoffset().total_seconds() / 3600
 
     return {

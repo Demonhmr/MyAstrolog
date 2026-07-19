@@ -1,7 +1,11 @@
 """
-chart_generator.py — v2
+chart_generator.py — v3
 Generates a Lunar Return wheel chart as PNG using matplotlib (Agg backend).
-Features: zodiac ring, houses, planets, aspects (6 types), retrograde markers.
+Features: zodiac ring, houses, planets, aspects (7 types), retrograde markers.
+
+Uses the object-oriented API (Figure + FigureCanvasAgg) instead of pyplot:
+pyplot keeps global state and is NOT thread-safe, while this function runs
+in a thread executor and may be called for several users concurrently.
 
 IMPORTANT: Call generate_chart_png inside asyncio.run_in_executor — it is CPU-heavy
 and will block the event loop for 2-60s on first run (matplotlib font cache build).
@@ -9,11 +13,9 @@ and will block the event loop for 2-60s on first run (matplotlib font cache buil
 
 import io
 import math
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-import numpy as np
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 
 
 # ── Zodiac metadata ──────────────────────────────────────────────────────────
@@ -92,8 +94,10 @@ def generate_chart_png(
     # FIX #5: Use exact degree if provided; fall back to sign boundary (0°, 30°, ...) only if missing
     asc_deg = chart_points.get("ascendant_deg", asc_sign_idx * 30.0)
 
-    # ── Figure ───────────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(10, 10), facecolor="#ffffff")
+    # ── Figure (OO API, no pyplot global state) ──────────────────────────────
+    fig = Figure(figsize=(10, 10), facecolor="#ffffff")
+    FigureCanvasAgg(fig)
+    ax = fig.add_subplot(111)
     ax.set_facecolor("#ffffff")
     ax.set_aspect("equal")
     ax.set_xlim(-1.65, 1.65)
@@ -133,32 +137,41 @@ def generate_chart_png(
 
     # ── Circles ───────────────────────────────────────────────────────────────
     for r, lw, alpha in [(R_OUTER, 1.5, 0.4), (R_ZODIAC_IN, 0.8, 0.3), (R_HOUSE_IN, 0.8, 0.2)]:
-        ax.add_patch(plt.Circle((0, 0), r, color="#222222", fill=False,
-                                linewidth=lw, alpha=alpha, zorder=3))
+        ax.add_patch(mpatches.Circle((0, 0), r, color="#222222", fill=False,
+                                     linewidth=lw, alpha=alpha, zorder=3))
 
-    ax.add_patch(plt.Circle((0, 0), R_ASPECT - 0.01, color="#fefefe", fill=True, zorder=4))
+    ax.add_patch(mpatches.Circle((0, 0), R_ASPECT - 0.01, color="#fefefe", fill=True, zorder=4))
 
-    # ── House lines ───────────────────────────────────────────────────────────
-    axis_labels = {0: "ASC", 3: "IC", 6: "DSC", 9: "MC"}
+    # ── House lines (Whole Sign: houses = signs, numbered from the ASC sign) ──
     for i in range(12):
         lon_h  = i * 30.0
         theta  = _lon_to_angle(lon_h, asc_deg)
         x_out, y_out = _polar(R_HOUSE_OUT, theta)
         x_in,  y_in  = _polar(R_HOUSE_IN,  theta)
-        is_major = (i % 3 == 0)
         ax.plot([x_in, x_out], [y_in, y_out],
-                color="#000000" if is_major else "#999999",
-                linewidth=1.2 if is_major else 0.5,
-                alpha=0.6 if is_major else 0.3, zorder=3)
-        if is_major and i in axis_labels:
-            lx, ly = _polar(R_HOUSE_OUT + 0.07, theta)
-            ax.text(lx, ly, axis_labels[i], ha="center", va="center",
-                    fontsize=8, color="#333333", fontweight="bold", alpha=0.85, zorder=6)
-        elif not is_major:
-            num_theta = _lon_to_angle(lon_h + 15.0, asc_deg)
-            nx, ny = _polar((R_HOUSE_OUT + R_HOUSE_IN) / 2, num_theta)
-            ax.text(nx, ny, str(i + 1), ha="center", va="center",
-                    fontsize=6.5, color="#666666", alpha=0.7, zorder=5)
+                color="#999999", linewidth=0.5, alpha=0.3, zorder=3)
+
+        # House number for the sign starting at lon_h, counted from the ASC sign
+        house_num = ((i - asc_sign_idx) % 12) + 1
+        num_theta = _lon_to_angle(lon_h + 15.0, asc_deg)
+        nx, ny = _polar((R_HOUSE_OUT + R_HOUSE_IN) / 2, num_theta)
+        ax.text(nx, ny, str(house_num), ha="center", va="center",
+                fontsize=6.5, color="#666666", alpha=0.7, zorder=5)
+
+    # ── Chart axes at their exact degrees ────────────────────────────────────
+    mc_deg = chart_points.get("midheaven_deg")
+    axes = [(asc_deg, "ASC"), (asc_deg + 180.0, "DSC")]
+    if mc_deg is not None:
+        axes += [(mc_deg, "MC"), (mc_deg + 180.0, "IC")]
+    for lon_a, label in axes:
+        theta = _lon_to_angle(lon_a, asc_deg)
+        x_out, y_out = _polar(R_HOUSE_OUT, theta)
+        x_in,  y_in  = _polar(R_HOUSE_IN,  theta)
+        ax.plot([x_in, x_out], [y_in, y_out],
+                color="#000000", linewidth=1.2, alpha=0.6, zorder=4)
+        lx, ly = _polar(R_HOUSE_OUT + 0.07, theta)
+        ax.text(lx, ly, label, ha="center", va="center",
+                fontsize=8, color="#333333", fontweight="bold", alpha=0.85, zorder=6)
 
     # ── Aspects ───────────────────────────────────────────────────────────────
     for i, p1 in enumerate(planets):
@@ -175,9 +188,9 @@ def generate_chart_png(
                         color=asp["color"], linestyle=asp["ls"],
                         linewidth=0.8, alpha=asp["alpha"], zorder=5)
 
-    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#ffffff", fill=True, zorder=8))
-    ax.add_patch(plt.Circle((0, 0), R_CENTER + 0.10, color="#9999bb", fill=False,
-                            linewidth=0.8, alpha=0.5, zorder=8))
+    ax.add_patch(mpatches.Circle((0, 0), R_CENTER + 0.10, color="#ffffff", fill=True, zorder=8))
+    ax.add_patch(mpatches.Circle((0, 0), R_CENTER + 0.10, color="#9999bb", fill=False,
+                                 linewidth=0.8, alpha=0.5, zorder=8))
 
     # ── Planets ───────────────────────────────────────────────────────────────
     placed = []
@@ -203,7 +216,7 @@ def generate_chart_png(
         dot_x, dot_y = _polar(R_ZODIAC_IN - 0.03, theta)
         ax.plot(dot_x, dot_y, "o", markersize=3, color=color, alpha=0.9, zorder=7)
         ax.plot([dot_x, px], [dot_y, py], "-", color=color, linewidth=0.5, alpha=0.35, zorder=6)
-        ax.add_patch(plt.Circle((px, py), 0.058, color="#ffffff", fill=True, zorder=9))
+        ax.add_patch(mpatches.Circle((px, py), 0.058, color="#ffffff", fill=True, zorder=9))
         ax.text(px, py, symbol, ha="center", va="center",
                 fontsize=13, color=color, fontweight="bold", zorder=10)
 
@@ -244,8 +257,7 @@ def generate_chart_png(
 
     # ── Export ────────────────────────────────────────────────────────────────
     buf = io.BytesIO()
-    plt.savefig(buf, format="png", dpi=150, bbox_inches="tight",
+    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
                 facecolor="#ffffff", edgecolor="none")
-    plt.close(fig)
     buf.seek(0)
     return buf.read()

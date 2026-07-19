@@ -1,16 +1,39 @@
 """
-interpretator.py — v2
+interpretator.py — v3
 Generates forecast report, dynamics report, and LLM prompt from interpretations JSON.
+All data paths are resolved relative to the package, not the working directory.
 """
 
 import json
 import re
-import os
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent.parent  # my_astro_bot/
+DATA_DIR = BASE_DIR / "data"
+
+PLANET_RU = {
+    "Sun": "Солнце", "Moon": "Луна", "Mercury": "Меркурий", "Venus": "Венера",
+    "Mars": "Марс", "Jupiter": "Юпитер", "Saturn": "Сатурн",
+    "Uranus": "Уран", "Neptune": "Нептун", "Pluto": "Плутон",
+}
+
+# Short house spheres for the dynamics report (ruler's house → life area)
+HOUSE_SPHERES = {
+    1: "личность и новые начинания", 2: "деньги и ресурсы",
+    3: "общение, контакты и учёба", 4: "дом и семья",
+    5: "творчество, дети и романтика", 6: "работа и здоровье",
+    7: "партнёрство и отношения", 8: "кризисы, чужие ресурсы и трансформация",
+    9: "путешествия, обучение и мировоззрение", 10: "карьера и статус",
+    11: "друзья, планы и сообщества", 12: "уединение, подсознание и завершение дел",
+}
 
 
 class ReportInterpretator:
-    def __init__(self, interpretations_path):
-        with open(interpretations_path, "r", encoding="utf-8") as f:
+    def __init__(self, interpretations_path=None):
+        path = Path(interpretations_path) if interpretations_path else (
+            DATA_DIR / "interpretations" / "interpretations.json"
+        )
+        with open(path, "r", encoding="utf-8") as f:
             self.data = json.load(f)
 
     def _sanitize(self, text):
@@ -19,7 +42,8 @@ class ReportInterpretator:
         text = re.sub(r"^\s*\*\s*", "• ", text, flags=re.MULTILINE)
         text = re.sub(r"^#+\s*", "", text, flags=re.MULTILINE)
         text = re.sub(r"^---\s*$", "", text, flags=re.MULTILINE)
-        text = text.replace("<", "&lt;").replace(">", "&gt;")
+        # Escape & first, otherwise it would double-escape &lt;/&gt;
+        text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         text = re.sub(r"\n{3,}", "\n\n", text)
         return text.strip()
 
@@ -47,9 +71,9 @@ class ReportInterpretator:
         house_text = self.data["houses"].get(str(synth_house), "Описание отсутствует")
 
         try:
-            with open("data/prompts/forecast_prompt_template.txt", "r", encoding="utf-8") as f:
+            with open(DATA_DIR / "prompts" / "forecast_prompt_template.txt", "r", encoding="utf-8") as f:
                 template = f.read()
-            with open("data/prompts/forecast_examples.txt", "r", encoding="utf-8") as f:
+            with open(DATA_DIR / "prompts" / "forecast_examples.txt", "r", encoding="utf-8") as f:
                 examples = f.read()
         except FileNotFoundError:
             return "Ошибка: Не найдены файлы шаблонов промта (data/prompts/...)"
@@ -109,6 +133,15 @@ class ReportInterpretator:
             )
         return report
 
+    def _ruler_line(self, ruler, house):
+        """One line about a ruler planet: house + life sphere (methodology step 5.3)."""
+        if not ruler or not house:
+            return ""
+        ruler_ru = PLANET_RU.get(ruler, ruler)
+        sphere = HOUSE_SPHERES.get(int(house), "")
+        sphere_part = f" — {sphere}" if sphere else ""
+        return f"Управитель — <b>{ruler_ru}</b> в Доме <b>{house}</b>{sphere_part}.\n\n"
+
     def generate_dynamics_report(self, dynamics):
         """Generate separate HTML message with month dynamics."""
         start_en = dynamics.get("start_sign", "")
@@ -120,6 +153,9 @@ class ReportInterpretator:
         start_text = self.data.get("sign_descriptions", {}).get(start_en, "")
         end_text   = self.data.get("sign_descriptions", {}).get(end_en, "")
 
+        asc_ruler_line = self._ruler_line(dynamics.get("asc_ruler"), dynamics.get("asc_ruler_house"))
+        mc_ruler_line  = self._ruler_line(dynamics.get("mc_ruler"),  dynamics.get("mc_ruler_house"))
+
         def _cap(s):
             s = self._sanitize(s) if s else "Описание отсутствует"
             return s[:1500] + "..." if len(s) > 1500 else s
@@ -127,9 +163,11 @@ class ReportInterpretator:
         return (
             f"📅 <b>Динамика месяца</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"🏁 <b>Начало месяца: Асцендент в {start_ru}</b>\n\n"
+            f"🏁 <b>Начало месяца: Асцендент в {start_ru}</b>\n"
+            f"{asc_ruler_line}"
             f"{_cap(start_text)}\n\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"🎯 <b>Конец месяца: MC в {end_ru}</b>\n\n"
+            f"🎯 <b>Конец месяца: MC в {end_ru}</b>\n"
+            f"{mc_ruler_line}"
             f"{_cap(end_text)}\n"
         )

@@ -1,7 +1,15 @@
 """
-calculator.py — v2
+calculator.py — v3
 Scoring engine: elements / crosses by sign and house, dominants, synthetic sign/house.
 """
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Methodology self-check: the planet weights sum to 26, so every
+# elements/crosses breakdown must also sum to 26.
+EXPECTED_TOTAL = 26
 
 
 class AstroCalculator:
@@ -68,7 +76,19 @@ class AstroCalculator:
                 house_scores["elements"][el] = house_scores["elements"].get(el, 0) + weight
                 house_scores["crosses"][cr]  = house_scores["crosses"].get(cr, 0)  + weight
 
+        self._verify_totals("signs", sign_scores)
+        self._verify_totals("houses", house_scores)
         return sign_scores, house_scores
+
+    @staticmethod
+    def _verify_totals(label, scores):
+        for kind in ("elements", "crosses"):
+            total = sum(scores[kind].values())
+            if total != EXPECTED_TOTAL:
+                logger.warning(
+                    f"Methodology check failed: {label}/{kind} total is {total}, "
+                    f"expected {EXPECTED_TOTAL}"
+                )
 
     def get_dominants(self, scores):
         """Returns (dominant_element, dominant_cross) or (None, None) if no data."""

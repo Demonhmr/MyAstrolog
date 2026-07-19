@@ -19,7 +19,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from core.astrology import AstrologyEngine
+from core.astrology import AstrologyEngine, SIGN_RULERS
 from core.calculator import AstroCalculator
 from core.interpretator import ReportInterpretator
 from core.chart_generator import generate_chart_png
@@ -115,10 +115,23 @@ async def process_birth_city(message: types.Message, state: FSMContext):
     except Exception:
         dt_context = None
 
+    await message.answer("🔍 Ищу город…")
     try:
-        geo = geocode_city(city_input, date_context=dt_context)
+        # Network call (Nominatim) — run in executor so the bot keeps
+        # responding to other users while geocoding
+        loop = asyncio.get_running_loop()
+        geo = await loop.run_in_executor(
+            None, partial(geocode_city, city_input, date_context=dt_context)
+        )
     except ValueError as e:
         await message.answer(str(e))
+        return  # Stay in state, let user retry
+    except Exception as e:
+        logging.error(f"Geocoding failed for {city_input!r}: {e}", exc_info=True)
+        await message.answer(
+            "Не удалось определить город — сервис не отвечает. "
+            "Попробуй отправить название ещё раз через минуту."
+        )
         return  # Stay in state, let user retry
 
     await state.update_data(
@@ -163,7 +176,7 @@ async def perform_calculation(message: types.Message, state: FSMContext):
     # 3. Compute
     engine = AstrologyEngine()
     calc   = AstroCalculator()
-    interp = ReportInterpretator("data/interpretations/interpretations.json")
+    interp = ReportInterpretator()  # resolves data paths relative to the package
 
     try:
         d, m, y   = map(int, user_data["birth_date"].split("."))
@@ -267,8 +280,19 @@ async def perform_calculation(message: types.Message, state: FSMContext):
             logging.warning(f"Chart generation failed: {chart_err}")
 
         # --- Message 3: forecast report ---
-        dynamics = {"start_sign": points["ascendant"], "end_sign": points["midheaven"]}
-        report   = interp.generate_report((el_s, cr_s), (el_h, cr_h), synth_s, synth_h, dynamics)
+        # Month dynamics per the methodology: ASC/MC signs + their rulers' houses
+        planet_by_name = {p["name"]: p for p in planets}
+        asc_ruler = SIGN_RULERS.get(points["ascendant"])
+        mc_ruler  = SIGN_RULERS.get(points["midheaven"])
+        dynamics = {
+            "start_sign":      points["ascendant"],
+            "end_sign":        points["midheaven"],
+            "asc_ruler":       asc_ruler,
+            "asc_ruler_house": planet_by_name.get(asc_ruler, {}).get("house"),
+            "mc_ruler":        mc_ruler,
+            "mc_ruler_house":  planet_by_name.get(mc_ruler, {}).get("house"),
+        }
+        report = interp.generate_report((el_s, cr_s), (el_h, cr_h), synth_s, synth_h, dynamics)
         await message.answer(report, parse_mode="HTML")
 
         # --- Message 4: dynamics ---
