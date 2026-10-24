@@ -30,6 +30,7 @@ HELP_TEXT = (
     "/profile — мои данные и их изменение\n"
     "/reminders — включить или выключить напоминания о новом месяце\n"
     "/premium — Звездица+\n"
+    "/paysupport — вопросы по оплате\n"
     "/delete — удалить мои данные\n\n"
     "<b>Как это работает.</b> Я нахожу момент, когда Луна возвращается в точку твоего "
     "рождения (в астрологии это называют лунаром), строю карту неба на этот момент "
@@ -173,21 +174,3 @@ async def cb_delete_no(callback: types.CallbackQuery):
     await callback.answer()
     await callback.message.edit_text("Хорошо, ничего не удаляю.")
 
-
-@router.message(Command("premium"), StateFilter("*"))
-async def cmd_premium(message: types.Message):
-    p = await _profile(message.from_user.id)
-    if p and p.is_premium():
-        await message.answer(f"✨ Звездица+ активна до {p.premium_until[:10]}.")
-        return
-    tail = (
-        "Оплата откроется совсем скоро."
-        if delivery.paywall_enabled()
-        else "Пока весь прогноз доступен бесплатно."
-    )
-    await message.answer(
-        "✨ <b>Звездица+</b>: живой разбор месяца «как хочешь / как будет», "
-        "начало и финал месяца, а скоро — советы по работе, деньгам и отношениям "
-        f"и прогнозы для близких.\n{tail}",
-        parse_mode="HTML",
-    )

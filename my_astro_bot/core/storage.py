@@ -37,6 +37,8 @@ CREATE TABLE IF NOT EXISTS users (
     next_cycle_utc    TEXT,                      -- начало следующего личного месяца (UTC, ISO)
     reminders_on      INTEGER NOT NULL DEFAULT 1,
     premium_until     TEXT,                      -- UTC ISO; NULL — бесплатный доступ
+    consent_version   TEXT,                      -- версия принятого согласия на обработку ПД
+    consent_at        TEXT,                      -- когда принято (UTC ISO)
     created_at        TEXT    NOT NULL,
     updated_at        TEXT    NOT NULL
 );
@@ -52,6 +54,18 @@ CREATE TABLE IF NOT EXISTS forecasts (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_due ON users (reminders_on, next_cycle_utc);
+
+CREATE TABLE IF NOT EXISTS payments (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id            INTEGER NOT NULL,
+    plan               TEXT    NOT NULL,         -- month | year
+    amount             INTEGER NOT NULL,         -- в Stars
+    currency           TEXT    NOT NULL,         -- XTR
+    charge_id          TEXT    NOT NULL UNIQUE,  -- telegram_payment_charge_id (нужен для возврата)
+    is_recurring       INTEGER NOT NULL DEFAULT 0,
+    premium_until      TEXT    NOT NULL,
+    created_at         TEXT    NOT NULL
+);
 """
 
 
@@ -75,6 +89,8 @@ class Profile:
     next_cycle_utc: Optional[str] = None
     reminders_on: bool = True
     premium_until: Optional[str] = None
+    consent_version: Optional[str] = None
+    consent_at: Optional[str] = None
 
     def is_premium(self, now: Optional[datetime] = None) -> bool:
         if not self.premium_until:
@@ -173,6 +189,39 @@ def set_premium_until(user_id: int, until_utc: Optional[datetime]) -> None:
             (until_utc.isoformat(timespec="seconds") if until_utc else None, _now_iso(), user_id),
         )
         conn.commit()
+
+
+def record_payment(user_id: int, plan: str, amount: int, currency: str, charge_id: str,
+                   is_recurring: bool, premium_until: datetime) -> bool:
+    """
+    Записывает платёж и продлевает подписку одной транзакцией.
+    Возвращает False, если этот платёж уже учтён (повторная доставка от Telegram).
+    """
+    until = premium_until.isoformat(timespec="seconds")
+    with closing(_connect()) as conn:
+        try:
+            conn.execute(
+                "INSERT INTO payments (user_id, plan, amount, currency, charge_id, is_recurring, "
+                "premium_until, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (user_id, plan, amount, currency, charge_id, int(is_recurring), until, _now_iso()),
+            )
+        except sqlite3.IntegrityError:
+            return False
+        conn.execute(
+            "UPDATE users SET premium_until = ?, updated_at = ? WHERE user_id = ?",
+            (until, _now_iso(), user_id),
+        )
+        conn.commit()
+    return True
+
+
+def payments_of(user_id: int) -> list:
+    with closing(_connect()) as conn:
+        rows = conn.execute(
+            "SELECT plan, amount, currency, charge_id, premium_until, created_at "
+            "FROM payments WHERE user_id = ? ORDER BY id", (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def due_profiles(now: Optional[datetime] = None, limit: int = 50) -> List[Profile]:

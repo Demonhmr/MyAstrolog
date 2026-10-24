@@ -14,7 +14,7 @@ from aiogram.types import BotCommand
 
 load_dotenv()
 
-from bot.handlers import common, registration  # noqa: E402  (после load_dotenv)
+from bot.handlers import common, payments, registration  # noqa: E402  (после load_dotenv)
 from bot.scheduler import reminder_loop  # noqa: E402
 from core import llm, storage  # noqa: E402
 
@@ -40,6 +40,7 @@ COMMANDS = [
     BotCommand(command="reminders", description="Напоминания о новом месяце"),
     BotCommand(command="premium", description="Звездица+"),
     BotCommand(command="help", description="Что умеет Звездица"),
+    BotCommand(command="paysupport", description="Вопросы по оплате"),
     BotCommand(command="delete", description="Удалить мои данные"),
 ]
 
@@ -68,6 +69,7 @@ async def main():
 
     dp = Dispatcher(storage=MemoryStorage())
     dp.update.outer_middleware(LoggingMiddleware())
+    dp.include_router(payments.router)
     dp.include_router(common.router)
     dp.include_router(registration.router)
 

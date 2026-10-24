@@ -62,7 +62,9 @@ async def get_story(profile: storage.Profile, f: Forecast) -> str:
     if cached:
         return cached
     prompt = _interp.generate_llm_prompt((f.el_s, f.cr_s), (f.el_h, f.cr_h), f.synth_sign, f.synth_house)
-    story = await llm.write_story(prompt, name=profile.name)
+    # Персональные данные (имя, даты, города) в нейросеть не передаём:
+    # промпт состоит только из описаний стихий, знаков и домов.
+    story = await llm.write_story(prompt)
     if story:
         await asyncio.to_thread(
             storage.save_story, profile.user_id, f.cycle_start_utc, f.cycle_end_utc, story

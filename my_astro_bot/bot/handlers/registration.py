@@ -9,6 +9,7 @@ bot/handlers/registration.py — анкета Звездицы.
 import asyncio
 import html
 import logging
+import os
 from datetime import datetime
 from functools import partial
 
@@ -20,6 +21,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot import delivery
 from core import storage
+from core.astrology import utcnow_naive
 from core.geocoder import geocode_city
 
 router = Router()
@@ -39,12 +41,23 @@ def display_name(user: types.User) -> str:
     return html.escape(name[:40], quote=False)
 
 
+CONSENT_VERSION = "v1-2026-10-24"
+
+
+def legal_links() -> str:
+    privacy = os.getenv("PRIVACY_URL", "https://zvezditsa.ru/privacy.html")
+    consent = os.getenv("CONSENT_URL", "https://zvezditsa.ru/consent.html")
+    return f'<a href="{privacy}">политика</a> и <a href="{consent}">согласие на обработку данных</a>'
+
+
 async def start_questionnaire(message: types.Message, state: FSMContext, user: types.User):
     await state.clear()
     await state.update_data(name=display_name(user))
     await message.answer(
-        "Когда ты родился(ась)? Напиши дату в формате <b>ДД.ММ.ГГГГ</b>, например 15.01.1990",
-        parse_mode="HTML",
+        "Когда ты родился(ась)? Напиши дату в формате <b>ДД.ММ.ГГГГ</b>, например 15.01.1990\n\n"
+        f"<i>Отвечая на вопросы, ты соглашаешься на обработку своих данных: {legal_links()}. "
+        "Удалить их можно в любой момент командой /delete.</i>",
+        parse_mode="HTML", disable_web_page_preview=True,
     )
     await state.set_state(Questionnaire.birth_date)
 
@@ -199,6 +212,8 @@ async def finish(message: types.Message, state: FSMContext, user: types.User):
         cur_tz=data["cur_tz"],
         reminders_on=old.reminders_on if old else True,
         premium_until=old.premium_until if old else None,
+        consent_version=CONSENT_VERSION,
+        consent_at=utcnow_naive().isoformat(timespec="seconds"),
     )
     await asyncio.to_thread(storage.save_profile, profile)
     await message.answer("✨ Запомнила. Считаю твой личный месяц…")

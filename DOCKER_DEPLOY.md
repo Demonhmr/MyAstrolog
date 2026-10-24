@@ -147,10 +147,12 @@ cd MyAstrolog
 ### 4. Создай `.env` с токеном боta
 
 ```bash
-cat > my_astro_bot/.env << 'EOF'
-BOT_TOKEN=ВАШ_ТОКЕН_ЗДЕСЬ
-EOF
+# .env лежит в КОРНЕ репозитория (рядом с docker-compose.yml)
+cp .env.example .env
+nano .env   # BOT_TOKEN, LLM_API_KEY, SUPPORT_CONTACT
 ```
+
+> Обновление на Звездицу (ветка `zvezditsa`): см. [docs/DEPLOY_ZVEZDITSA.md](docs/DEPLOY_ZVEZDITSA.md).
 
 > [!CAUTION]
 > Не коммить `.env` в Git — он уже добавлен в `.gitignore`.

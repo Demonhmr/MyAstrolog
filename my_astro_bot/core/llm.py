@@ -61,10 +61,11 @@ def to_telegram_html(text: str) -> str:
     return t
 
 
-async def write_story(user_prompt: str, name: str = "") -> Optional[str]:
+async def write_story(user_prompt: str) -> Optional[str]:
     """
     Возвращает готовый Telegram-HTML текст или None, если нейросеть
     не настроена или не ответила (тогда бот берёт текст из справочника).
+    В user_prompt не должно быть персональных данных: сервис зарубежный.
     """
     key = os.getenv("LLM_API_KEY")
     if not key:
@@ -72,14 +73,13 @@ async def write_story(user_prompt: str, name: str = "") -> Optional[str]:
     base = os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
     model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
 
-    who = f"Человека зовут {name}. " if name else ""
     payload = {
         "model": model,
         "temperature": 0.8,
         "max_tokens": 2000,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": who + user_prompt},
+            {"role": "user", "content": user_prompt},
         ],
     }
     headers = {

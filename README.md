@@ -30,7 +30,8 @@ Telegram-бот, личный астролог. Считает **личный м
 | `/forecast` | прогноз на текущий личный месяц |
 | `/profile` | данные пользователя и их изменение |
 | `/reminders` | включить / выключить напоминания |
-| `/premium` | Звездица+ (оплата — этап 2) |
+| `/premium` | Звездица+: оплата звёздами Telegram (месяц с автопродлением или год) |
+| `/paysupport` | вопросы по оплате и возвраты |
 | `/delete` | удалить данные и прогнозы |
 
 ## Переменные окружения (`.env` в корне репозитория)
@@ -41,7 +42,10 @@ Telegram-бот, личный астролог. Считает **личный м
 | `LLM_API_KEY` | ключ OpenRouter для живого текста; без него — справочник |
 | `LLM_MODEL` | модель, по умолчанию `anthropic/claude-sonnet-5.5` |
 | `LLM_BASE_URL` | OpenAI-совместимый API, по умолчанию OpenRouter |
-| `PAYWALL_ENABLED` | `true` — без подписки только короткий прогноз; по умолчанию `false` |
+| `PAYWALL_ENABLED` | `true` — без подписки только короткий прогноз, в /premium кнопки оплаты; по умолчанию `false` |
+| `PRICE_MONTH_STARS`, `PRICE_YEAR_STARS` | цены в звёздах, по умолчанию 200 и 1700 |
+| `SUPPORT_CONTACT` | контакт для /paysupport |
+| `PRIVACY_URL`, `CONSENT_URL`, `TERMS_URL` | ссылки на документы, по умолчанию zvezditsa.ru/*.html |
 | `DB_PATH` | путь к SQLite; по умолчанию `my_astro_bot/storage/zvezditsa.db` |
 
 ## Запуск
@@ -58,7 +62,11 @@ python3 -m venv .venv && .venv/bin/pip install -r my_astro_bot/requirements-dev.
 cd my_astro_bot && ../.venv/bin/python -m bot.main
 ```
 
-Подробности про VPS: [docs/SETUP.md](docs/SETUP.md), [DOCKER_DEPLOY.md](DOCKER_DEPLOY.md).
+Выкладка на VPS и лендинг: [docs/DEPLOY_ZVEZDITSA.md](docs/DEPLOY_ZVEZDITSA.md).
+
+## Лендинг
+
+`landing/` — статический сайт zvezditsa.ru: главная, политика конфиденциальности, согласие, оферта. Жёлтым отмечены реквизиты оператора, которые нужно заполнить.
 
 ## Тесты
 
@@ -76,14 +84,16 @@ my_astro_bot/
 │   ├── scheduler.py         # напоминания о новом личном месяце
 │   └── handlers/
 │       ├── common.py        # команды и кнопки
-│       └── registration.py  # анкета из 4 вопросов
+│       ├── payments.py      # /premium, оплата звёздами, /paysupport
+│       └── registration.py  # анкета из 4 вопросов + согласие
 ├── core/
 │   ├── astrology.py         # лунарный возврат на Swiss Ephemeris
 │   ├── calculator.py        # баллы, доминанты, роль и задача месяца
 │   ├── forecast.py          # расчёт прогноза для профиля
 │   ├── texts.py             # тексты для людей (словарь терминов)
 │   ├── llm.py               # живой текст через OpenRouter
-│   ├── storage.py           # SQLite: профили и архив прогнозов
+│   ├── storage.py           # SQLite: профили, архив прогнозов, платежи
+│   ├── billing.py           # тарифы и продление подписки
 │   ├── chart_generator.py   # карта неба (matplotlib)
 │   ├── geocoder.py          # Nominatim + TimezoneFinder
 │   └── interpretator.py     # справочник и промпт для нейросети
