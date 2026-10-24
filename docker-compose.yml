@@ -1,11 +1,13 @@
 services:
   bot:
     build: .
-    container_name: myastro_bot
+    container_name: zvezditsa_bot
     restart: unless-stopped
     env_file:
       - .env
     volumes:
+      # База пользователей и прогнозов — в томе, чтобы переживала пересборку
+      - zvezditsa_data:/app/storage
       # Кэш шрифтов matplotlib — без него первый рендер занимает 30-60 сек при каждом рестарте
       - matplotlib_cache:/root/.cache/matplotlib
     logging:
@@ -15,4 +17,5 @@ services:
         max-file: "3"
 
 volumes:
+  zvezditsa_data:
   matplotlib_cache:

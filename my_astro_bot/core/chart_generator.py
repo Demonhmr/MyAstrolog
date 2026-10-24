@@ -55,6 +55,12 @@ ASPECTS = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+PLANET_SHORT_RU = {
+    "Sun": "Солн", "Moon": "Луна", "Mercury": "Мерк", "Venus": "Вен", "Mars": "Марс",
+    "Jupiter": "Юпит", "Saturn": "Сат", "Uranus": "Уран", "Neptune": "Непт", "Pluto": "Плут",
+}
+
+
 def _lon_to_angle(lon_deg: float, asc_deg: float) -> float:
     return math.radians((lon_deg - asc_deg + 180.0) % 360)
 
@@ -83,6 +89,7 @@ def generate_chart_png(
     birth_time: str,
     city: str,
     chart_title: str = "Карта Лунарного возврата",
+    footer: str = "",
 ) -> bytes:
     SIGN_NAMES_EN = [
         "Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo",
@@ -235,6 +242,11 @@ def generate_chart_png(
     ax.text(0, -1.58, chart_title, ha="center", va="center",
             fontsize=11, color="#333333", fontstyle="italic", zorder=11)
 
+    # ── Brand mark (картинку пересылают — по ней должны найти бота) ───────────
+    if footer:
+        ax.text(1.62, -1.64, footer, ha="right", va="center",
+                fontsize=8, color="#b8860b", fontweight="bold", zorder=11)
+
     # ── Planet legend ─────────────────────────────────────────────────────────
     legend_y   = 1.53
     step       = 1.9 / max(len(planets) - 1, 1)
@@ -244,7 +256,8 @@ def generate_chart_png(
         lx    = -0.95 + j * step
         label = (sym + "℞") if p.get("is_retro") else sym
         ax.text(lx, legend_y,        label,           ha="center", va="center", fontsize=9,   color=col,       zorder=11)
-        ax.text(lx, legend_y - 0.10, p["name"][:3],  ha="center", va="center", fontsize=5.5, color="#444444", zorder=11)
+        ax.text(lx, legend_y - 0.10, PLANET_SHORT_RU.get(p["name"], p["name"][:3]),
+                ha="center", va="center", fontsize=5.5, color="#444444", zorder=11)
 
     # ── Aspect legend ─────────────────────────────────────────────────────────
     asp_legend = [("☌", "#f1c40f"), ("☍", "#e74c3c"), ("△", "#2ecc71"),

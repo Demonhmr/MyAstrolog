@@ -7,3 +7,7 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+
+# База Звездицы
+storage/
+*.db

@@ -8,3 +8,6 @@ test_chart*.png
 _debug.json
 .git/
 *.md
+storage/
+tests/
+.pytest_cache/

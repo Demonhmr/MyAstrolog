@@ -54,13 +54,12 @@ class AstrologyEngine:
             dt = datetime(y, m, d, hour, minute) + timedelta(seconds=second)
         return dt
 
-    def get_lunar_return(self, name, year, month, day, hour, minute, lat, lon, utc_offset):
+    def get_lunar_return(self, name, year, month, day, hour, minute, lat, lon, utc_offset, at=None):
         """
         Calculates the Lunar Return exactly using zero-crossing on moon longitude.
 
-        Returns the cycle CONTAINING today: the most recent return before now
-        (so the forecast always describes the currently active lunar month),
-        with the end date at the next return.
+        Returns the cycle CONTAINING `at` (default: now, naive UTC): the most
+        recent return before that moment, with the end date at the next return.
         """
         # 1. Calculate Natal Moon Position
         natal_date = datetime(year, month, day, hour, minute)
@@ -73,7 +72,7 @@ class AstrologyEngine:
         # 2. Find the last return BEFORE now. A 28-day back-window always
         # contains 1–2 crossings (lunar cycle ≈ 27.32 days); take the latest
         # one that is still in the past.
-        now_utc = utcnow_naive()
+        now_utc = at or utcnow_naive()
         now_jd = self._datetime_to_jd(now_utc)
         start_jd = self._datetime_to_jd(now_utc - timedelta(days=28))
 

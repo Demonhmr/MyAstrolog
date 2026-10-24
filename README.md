@@ -1,105 +1,92 @@
-# 🌙 MyAstro Bot v3
+# ✨ Звездица
 
-Telegram-бот для составления персонального астрологического прогноза на месяц методом **Лунарного возврата**.
+Telegram-бот, личный астролог. Считает **личный месяц** человека (метод лунарного возврата: момент, когда Луна возвращается в точку рождения) и объясняет его простыми словами: чего захочется в этом месяце и чего захочет жизнь.
 
-## Возможности
+Бывший MyAstro Bot. Концепция и линейка услуг утверждены 24.10.2026.
 
-- 🪐 Расчёт позиций 10 планет на Swiss Ephemeris (pyswisseph)
-- 🔄 Определение ретроградности по скорости планеты
-- 🗺 PNG-карта колеса Лунарного возврата с аспектами (7 видов)
-- 📊 Расчёт доминант по стихиям и крестам, синтетический знак и дом
-- 📅 Динамика месяца: ASC/MC + дома их управителей
-- 🤖 Генерация структурированного промта для ChatGPT / Claude
+## Что получает пользователь
 
-## Стек
+1. **Личный месяц**: даты начала и конца, роль месяца, главная задача
+2. **Карта неба** на начало месяца (со знаком Звездицы для пересылки)
+3. **«Как ты хочешь и как будет на самом деле»**: живой текст от нейросети (без ключа — текст из справочника)
+4. **Как начнётся и чем закончится месяц**
+5. Кнопка **«Подробно для знатоков»**: планеты, баллы, термины методики
 
-| Компонент | Технология |
-|-----------|-----------|
-| Bot API | aiogram 3.x |
-| Астрономия | pyswisseph (Swiss Ephemeris) |
-| Геокодинг | Nominatim (OpenStreetMap) |
-| Часовые пояса | TimezoneFinder (offline) |
-| Карты | matplotlib (Agg, OO API) |
-| Деплой | Docker + docker-compose |
+Данные сохраняются: когда начинается новый личный месяц, бот сам присылает прогноз.
 
-📖 **Подробная инструкция по запуску (VPS, разработка, обновление, проблемы): [docs/SETUP.md](docs/SETUP.md)**
-
-## Запуск локально
-
-```bash
-# 1. Клонировать
-git clone https://github.com/Demonhmr/MyAstrolog.git
-cd MyAstrolog
-
-# 2. Создать .env в корне репозитория
-cp .env.example .env
-# вставить BOT_TOKEN
-
-# 3. Установить зависимости
-cd my_astro_bot
-pip install -r requirements.txt
-
-# 4. Запустить (из папки my_astro_bot)
-python -m bot.main
-```
-
-## Запуск через Docker
-
-```bash
-cd MyAstrolog
-cp .env.example .env   # вставить BOT_TOKEN
-docker compose up -d --build
-```
-
-## FSM поток данных
+## Анкета
 
 ```
-/start → Начинаем! 🚀
-    ↓
-Имя → Дата рождения → Время → Город рождения
-    ↓
-📊 Данные расчёта → 🗺 Карта PNG → 🌙 Прогноз → 📅 Динамика → 🤖 LLM-промт
-    ↓
-🔄 Начнём заново!
+/start → дата рождения → время (или «Не знаю время») → город рождения → где ты сейчас (или «В городе рождения»)
 ```
 
-Карта строится по городу рождения (упрощённый поток — текущее местоположение не запрашивается). Бот выбирает лунарный цикл, **содержащий сегодняшний день**.
+Имя берётся из Telegram. Если время неизвестно, прогноз считается на 12:00 и помечается как приблизительный.
 
-## Переменные окружения
+## Команды
+
+| Команда | Что делает |
+|---|---|
+| `/start` | приветствие; вернувшемуся — кнопка прогноза |
+| `/forecast` | прогноз на текущий личный месяц |
+| `/profile` | данные пользователя и их изменение |
+| `/reminders` | включить / выключить напоминания |
+| `/premium` | Звездица+ (оплата — этап 2) |
+| `/delete` | удалить данные и прогнозы |
+
+## Переменные окружения (`.env` в корне репозитория)
 
 | Переменная | Описание |
-|-----------|---------|
-| `BOT_TOKEN` | Токен бота от @BotFather |
+|---|---|
+| `BOT_TOKEN` | токен бота от @BotFather (обязательно) |
+| `LLM_API_KEY` | ключ OpenRouter для живого текста; без него — справочник |
+| `LLM_MODEL` | модель, по умолчанию `anthropic/claude-sonnet-5.5` |
+| `LLM_BASE_URL` | OpenAI-совместимый API, по умолчанию OpenRouter |
+| `PAYWALL_ENABLED` | `true` — без подписки только короткий прогноз; по умолчанию `false` |
+| `DB_PATH` | путь к SQLite; по умолчанию `my_astro_bot/storage/zvezditsa.db` |
+
+## Запуск
+
+```bash
+cp .env.example .env          # вписать BOT_TOKEN и LLM_API_KEY
+docker compose up -d --build  # база хранится в томе zvezditsa_data
+```
+
+Локально:
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r my_astro_bot/requirements-dev.txt
+cd my_astro_bot && ../.venv/bin/python -m bot.main
+```
+
+Подробности про VPS: [docs/SETUP.md](docs/SETUP.md), [DOCKER_DEPLOY.md](DOCKER_DEPLOY.md).
 
 ## Тесты
 
 ```bash
-cd my_astro_bot
-pip install -r requirements-dev.txt
-pytest
+cd my_astro_bot && ../.venv/bin/python -m pytest
 ```
 
 ## Структура
 
 ```
-MyAstrolog/
-├── my_astro_bot/
-│   ├── bot/
-│   │   ├── main.py              # точка входа, /start, /help, /ping
-│   │   └── handlers/
-│   │       └── registration.py  # FSM, 4 состояния
-│   ├── core/
-│   │   ├── astrology.py         # AstrologyEngine (pyswisseph), Lunar Return, управители
-│   │   ├── calculator.py        # AstroCalculator, доминанты, проверка суммы 26
-│   │   ├── chart_generator.py   # matplotlib wheel chart (потокобезопасный)
-│   │   ├── geocoder.py          # Nominatim + TimezoneFinder
-│   │   └── interpretator.py     # ReportInterpretator
-│   ├── data/
-│   │   ├── interpretations/     # interpretations.json
-│   │   └── prompts/             # шаблоны LLM-промта
-│   ├── tests/                   # pytest
-│   └── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-└── .env.example                 # → скопировать в .env
+my_astro_bot/
+├── bot/
+│   ├── main.py              # запуск: база, команды, напоминания, polling
+│   ├── delivery.py          # отправка прогноза (короткий / полный)
+│   ├── scheduler.py         # напоминания о новом личном месяце
+│   └── handlers/
+│       ├── common.py        # команды и кнопки
+│       └── registration.py  # анкета из 4 вопросов
+├── core/
+│   ├── astrology.py         # лунарный возврат на Swiss Ephemeris
+│   ├── calculator.py        # баллы, доминанты, роль и задача месяца
+│   ├── forecast.py          # расчёт прогноза для профиля
+│   ├── texts.py             # тексты для людей (словарь терминов)
+│   ├── llm.py               # живой текст через OpenRouter
+│   ├── storage.py           # SQLite: профили и архив прогнозов
+│   ├── chart_generator.py   # карта неба (matplotlib)
+│   ├── geocoder.py          # Nominatim + TimezoneFinder
+│   └── interpretator.py     # справочник и промпт для нейросети
+├── data/                    # справочник интерпретаций, промпт и примеры тона
+└── tests/
 ```
