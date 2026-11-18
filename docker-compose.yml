@@ -1,3 +1,5 @@
+name: zvezditsa
+
 services:
   bot:
     build: .
