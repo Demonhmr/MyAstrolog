@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "Звездица — твой личный месяц",
+  "short_name": "Звездица",
+  "description": "Прогноз на личный месяц по дате, времени и месту рождения: чего тебе захочется и чего захочет жизнь.",
+  "lang": "ru",
+  "start_url": "./#month",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#10142b",
+  "theme_color": "#10142b",
+  "categories": ["lifestyle", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

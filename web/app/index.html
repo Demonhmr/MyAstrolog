@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Звездица — твой личный месяц</title>
+<meta name="description" content="Прогноз на твой личный месяц по дате, времени и месту рождения: чего тебе захочется и чего захочет жизнь.">
+<meta name="theme-color" content="#10142b">
+<meta name="color-scheme" content="dark">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/yeseva-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="app.css?v=1">
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="#month" aria-label="Звездица — к прогнозу">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6z" fill="currentColor"/></svg>
+    Звездица
+  </a>
+  <a class="icon-btn" id="to-settings" href="#settings" aria-label="Настройки" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.5.1-1-.1-1 2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6-.1 1 .1 1-2 1.6 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.5h4l.4-2.5c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+  </a>
+</header>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<main>
+
+<!-- ── Анкета ─────────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="form" hidden>
+  <div class="wrap narrow stack-lg">
+    <div class="stack">
+      <p class="eyebrow">4 вопроса · около минуты</p>
+      <h1 class="title" id="form-title">Узнай свой личный месяц</h1>
+      <p class="lead">Звездица считает его по дате, времени и месту рождения. Данные хранятся только на этом устройстве.</p>
+    </div>
+
+    <form id="profile-form" class="stack-lg" novalidate>
+      <div class="field">
+        <label for="f-date">Дата рождения</label>
+        <input id="f-date" name="date" inputmode="numeric" autocomplete="bday" placeholder="ДД.ММ.ГГГГ" maxlength="10" required>
+        <p class="err" id="e-date" hidden></p>
+      </div>
+
+      <div class="field">
+        <label for="f-time">Время рождения</label>
+        <input id="f-time" name="time" type="time" required>
+        <label class="check"><input type="checkbox" id="f-time-unknown"> Не знаю точное время</label>
+        <p class="hint" id="h-time" hidden>Ничего страшного: прогноз будет приблизительным, начало месяца может сдвинуться на несколько часов.</p>
+        <p class="err" id="e-time" hidden></p>
+      </div>
+
+      <div class="field" id="birth-city">
+        <label for="f-birth-q">Город рождения</label>
+        <div class="city-search">
+          <input id="f-birth-q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Например, Казань">
+          <button type="button" class="btn ghost small" data-act="find">Найти</button>
+        </div>
+        <div class="city-results" role="radiogroup" aria-label="Найденные города"></div>
+        <div class="city-chosen" hidden><span></span><button type="button" class="link" data-act="change">изменить</button></div>
+        <p class="err" hidden></p>
+      </div>
+
+      <fieldset class="field">
+        <legend>Где ты сейчас</legend>
+        <label class="check"><input type="radio" name="where" value="same" checked> В городе рождения</label>
+        <label class="check"><input type="radio" name="where" value="other"> В другом городе</label>
+        <p class="hint">Месяц начинается в одно и то же мгновение везде, но карта неба зависит от того, где ты находишься.</p>
+      </fieldset>
+
+      <div class="field" id="cur-city" hidden>
+        <label for="f-cur-q">Город, где ты сейчас</label>
+        <div class="city-search">
+          <input id="f-cur-q" type="search" enterkeyhint="search" autocomplete="off" placeholder="Например, Москва">
+          <button type="button" class="btn ghost small" data-act="find">Найти</button>
+        </div>
+        <div class="city-results" role="radiogroup" aria-label="Найденные города"></div>
+        <div class="city-chosen" hidden><span></span><button type="button" class="link" data-act="change">изменить</button></div>
+        <p class="err" hidden></p>
+      </div>
+
+      <div class="field">
+        <label class="check consent"><input type="checkbox" id="f-consent" required>
+          <span>Соглашаюсь на <a href="../consent.html" data-doc>обработку данных</a> и принимаю <a href="../privacy.html" data-doc>политику конфиденциальности</a></span>
+        </label>
+        <p class="err" id="e-consent" hidden></p>
+      </div>
+
+      <div class="stack">
+        <button class="btn" type="submit" id="f-submit">Рассчитать мой месяц</button>
+        <button class="btn ghost" type="button" id="f-cancel" hidden>Отмена</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ── Прогноз ────────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="month" hidden>
+  <div class="month-hero">
+    <div class="wrap narrow stack">
+      <p class="eyebrow" id="m-eyebrow">Твой личный месяц</p>
+      <h1 class="title" id="m-dates"></h1>
+      <p class="fine" id="m-city"></p>
+      <p class="note" id="m-time-warn" hidden>Время рождения неизвестно, поэтому прогноз приблизительный: начало месяца может сдвинуться на несколько часов, а «как начнётся месяц» — измениться.</p>
+      <p class="note" id="m-offline" hidden>Нет связи — показан сохранённый прогноз.</p>
+      <nav class="month-nav" aria-label="Другие месяцы">
+        <button class="btn ghost small" id="m-prev">← Прошлый</button>
+        <button class="btn ghost small" id="m-now" hidden>Текущий</button>
+        <button class="btn ghost small" id="m-next">Следующий →</button>
+      </nav>
+    </div>
+  </div>
+
+  <div class="wrap narrow stack-lg month-body" id="m-body" aria-busy="false">
+    <div class="cards">
+      <article class="card">
+        <p class="eyebrow">Роль месяца</p>
+        <h2 class="card-title"><span id="m-role-title"></span> <span class="sign" id="m-role-sign"></span></h2>
+        <p id="m-role-text"></p>
+      </article>
+      <article class="card">
+        <p class="eyebrow">Главная задача</p>
+        <h2 class="card-title" id="m-task-title"></h2>
+        <p id="m-task-text"></p>
+      </article>
+    </div>
+
+    <section class="stack">
+      <h2 class="title-2">Как ты хочешь и как будет на самом деле</h2>
+      <div class="versus">
+        <div class="us"><h3>Внутри</h3><p id="m-inner"></p></div>
+        <div class="them"><h3>Снаружи</h3><p id="m-outer"></p></div>
+      </div>
+      <div class="story" id="m-story"></div>
+    </section>
+
+    <section class="stack">
+      <h2 class="title-2">Карта неба на начало месяца</h2>
+      <figure class="chart">
+        <div class="chart-frame"><img id="m-chart" alt="Карта неба на начало личного месяца" hidden><div class="chart-wait" id="m-chart-wait">Рисуем карту…</div></div>
+        <figcaption class="row">
+          <button class="btn ghost small" id="m-share" hidden>Поделиться картой</button>
+        </figcaption>
+      </figure>
+    </section>
+
+    <section class="stack">
+      <h2 class="title-2">Как начнётся и чем закончится месяц</h2>
+      <div class="stack" id="m-dyn"></div>
+    </section>
+
+    <details class="expert">
+      <summary>Подробно для знатоков</summary>
+      <div id="m-expert" class="stack"></div>
+    </details>
+
+    <section class="card next" id="m-next-card">
+      <p class="eyebrow">Следующий личный месяц</p>
+      <p class="card-title-sm" id="m-next-date"></p>
+      <div id="m-reminder" hidden>
+        <label class="switch"><input type="checkbox" id="m-reminder-on"> <span>Напомнить, когда начнётся</span></label>
+      </div>
+    </section>
+  </div>
+</section>
+
+<!-- ── Настройки ──────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="settings" hidden>
+  <div class="wrap narrow stack-lg">
+    <h1 class="title">Настройки</h1>
+
+    <section class="card stack">
+      <p class="eyebrow">Мои данные</p>
+      <dl class="facts" id="s-facts"></dl>
+      <button class="btn ghost small" id="s-edit">Изменить</button>
+    </section>
+
+    <section class="card stack" id="s-reminder" hidden>
+      <p class="eyebrow">Напоминание</p>
+      <label class="switch"><input type="checkbox" id="s-reminder-on"> <span>Сообщать о начале нового личного месяца</span></label>
+    </section>
+
+    <section class="card stack">
+      <p class="eyebrow">Документы</p>
+      <a href="../privacy.html" data-doc>Политика конфиденциальности</a>
+      <a href="../consent.html" data-doc>Согласие на обработку данных</a>
+    </section>
+
+    <section class="card stack">
+      <p class="eyebrow">Стереть данные</p>
+      <p class="muted">Удалит дату, время и города рождения и сохранённые прогнозы с этого устройства. На сервере они не хранятся.</p>
+      <button class="btn danger small" id="s-erase">Стереть мои данные</button>
+    </section>
+
+    <p class="fine" id="s-version"></p>
+  </div>
+</section>
+
+</main>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>
