@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Название под иконкой -->
+    <string name="app_name">Звездица</string>
+    <string name="share_card">Поделиться картой</string>
+    <string name="no_app">Не нашлось приложения, чтобы открыть ссылку</string>
+    <string name="doc_back">← Назад в Звездицу</string>
+    <string name="offline_title">Нет связи со Звездицей</string>
+    <string name="offline_text">Проверьте интернет и попробуйте ещё раз.\nПосле первого прогноза Звездица открывается и без сети.</string>
+    <string name="retry">Повторить</string>
+    <string name="channel_name">Новый личный месяц</string>
+    <string name="channel_desc">Напоминание, когда начинается ваш новый личный месяц</string>
+    <string name="notif_title">Начался твой новый личный месяц</string>
+    <string name="notif_text">Посмотри роль и главную задачу месяца</string>
+    <string name="notif_denied">Уведомления выключены — включите их в настройках телефона, чтобы получать напоминания</string>
+</resources>

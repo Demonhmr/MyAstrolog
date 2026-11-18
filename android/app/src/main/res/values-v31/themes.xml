@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZV" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/night2</item>
+        <item name="android:colorBackground">@color/night2</item>
+        <item name="android:colorPrimary">@color/night</item>
+        <item name="android:colorPrimaryDark">@color/night</item>
+        <item name="android:colorAccent">@color/gold</item>
+        <item name="android:statusBarColor">@color/night</item>
+        <item name="android:navigationBarColor">@color/night2</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Заставка Android 12+: эмблема на ночном фоне -->
+        <item name="android:windowSplashScreenBackground">@color/night2</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_fg</item>
+    </style>
+</resources>

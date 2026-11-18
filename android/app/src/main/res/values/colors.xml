@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="night">#10142b</color>
+    <color name="night2">#10142b</color>
+    <color name="icon_bg">#10142b</color>
+    <color name="gold">#f0c35a</color>
+    <color name="moon_dim">#aeb4d0</color>
+    <color name="doc_band">#f6f6fb</color>
+    <color name="doc_ink">#8a5d06</color>
+</resources>

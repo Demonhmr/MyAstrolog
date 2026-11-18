@@ -133,7 +133,8 @@ class RateLimit:
                 del self.hits[k]
 
 
-_rl_forecast = RateLimit(int(os.getenv("RL_FORECAST", "40")), 600)
+# Мобильные операторы сажают многих абонентов на один IP — лимит с запасом; процессор бережёт _heavy
+_rl_forecast = RateLimit(int(os.getenv("RL_FORECAST", "120")), 600)
 _rl_cities = RateLimit(int(os.getenv("RL_CITIES", "30")), 60)
 
 

@@ -1,13 +1,13 @@
 /* Звездица — веб-приложение (оно же внутри Android-оболочки).
    Профиль хранится только на устройстве (localStorage), сервер /api/ ничего не запоминает.
-   Android-оболочка добавляет window.ZVAndroid: setReminder(utcMs, title, text), cancelReminder(), appVersion(). */
+   Android-оболочка добавляет window.ZVAndroid: setReminder(JSON-массив мс UTC), cancelReminder(), appVersion(), shareFile(). */
 (function () {
   'use strict';
 
   var APP_VERSION = '1.0';
   var API = '../api';
   var CONSENT_VERSION = 'web-v1-2026-11-18';
-  var KEY = { profile: 'zv.profile', last: 'zv.last', chart: 'zv.chart', reminder: 'zv.reminder' };
+  var KEY = { profile: 'zv.profile', last: 'zv.last', chart: 'zv.chart', reminder: 'zv.reminder', remKey: 'zv.remkey' };
   var android = window.ZVAndroid || null;
 
   // ── мелочи ──────────────────────────────────────────────────────────────
@@ -405,21 +405,27 @@
   // ── напоминание (только в Android-приложении) ─────────────────────────
   function reminderSupported() { return !!(android && android.setReminder); }
   function reminderOn() { var v = store.get(KEY.reminder); return v === null ? true : !!v; }
-  function syncReminder(rep) {
+  // Оболочке передаём начало трёх следующих месяцев — напоминания придут, даже если приложение долго не открывать
+  function syncReminder(rep, force) {
     if (!reminderSupported()) return;
-    try {
-      if (reminderOn()) {
-        android.setReminder(String(Date.parse(rep.cycle.end_utc)),
-          'Начался твой новый личный месяц',
-          'Посмотри роль и главную задачу месяца');
-      } else android.cancelReminder();
-    } catch (e) { /* старая оболочка */ }
+    if (!reminderOn()) { try { android.cancelReminder(); } catch (e) { /* нет */ } return; }
+    var key = profileKey() + '|' + rep.cycle.end_utc;
+    if (!force && store.get(KEY.remKey) === key) return;
+    var ends = [rep.cycle.end_utc];
+    function more(end) { return api('POST', '/forecast', requestBody(shiftIso(end, 1))).then(function (r) { ends.push(r.cycle.end_utc); return r.cycle.end_utc; }); }
+    more(rep.cycle.end_utc).then(more).catch(function () { /* хватит и одного */ }).then(function () {
+      try {
+        android.setReminder(JSON.stringify(ends.map(function (e) { return Date.parse(e); })));
+        store.set(KEY.remKey, key);
+      } catch (e) { /* старая оболочка */ }
+    });
   }
   function setReminder(on) {
     store.set(KEY.reminder, on);
     $('#m-reminder-on').checked = on; $('#s-reminder-on').checked = on;
     var last = store.get(KEY.last);
-    if (last && last.report) syncReminder(last.report);
+    store.del(KEY.remKey);
+    if (last && last.report) syncReminder(last.report, true);
     else if (!on && reminderSupported()) android.cancelReminder();
     toast(on ? 'Напомним, когда начнётся новый месяц' : 'Напоминание выключено');
   }
@@ -443,7 +449,7 @@
   $('#s-edit').addEventListener('click', function () { location.hash = '#form'; });
   $('#s-erase').addEventListener('click', function () {
     if (!confirm('Стереть твои данные и сохранённые прогнозы с этого устройства?')) return;
-    [KEY.profile, KEY.last, KEY.chart, KEY.reminder].forEach(store.del);
+    [KEY.profile, KEY.last, KEY.chart, KEY.reminder, KEY.remKey].forEach(store.del);
     try { if (reminderSupported()) android.cancelReminder(); } catch (e) { /* нет */ }
     profile = null; loadedKey = null; viewAt = null; current = null;
     $('#profile-form').reset(); birthCity.set(null); curCity.set(null);

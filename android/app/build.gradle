@@ -1,0 +1,59 @@
+plugins {
+    id 'com.android.application'
+}
+
+// Подпись релиза: keystore.properties рядом с этим проектом (в git не кладём)
+def ksFile = rootProject.file('keystore.properties')
+def ks = new Properties()
+if (ksFile.exists()) ksFile.withInputStream { ks.load(it) }
+
+android {
+    namespace 'ru.zvezditsa.app'
+    compileSdk 36
+
+    defaultConfig {
+        // ВНИМАНИЕ: applicationId после первой публикации в сторе менять нельзя
+        applicationId 'ru.zvezditsa.app'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '1.0'
+        // Откуда грузится приложение. Появится домен zvezditsa.ru — поменять здесь (и выпустить новую версию)
+        buildConfigField 'String', 'START_URL', '"https://zvezditsa.137-22-150-127.sslip.io/app/"'
+        buildConfigField 'String', 'SITE_HOST', '"zvezditsa.137-22-150-127.sslip.io"'
+    }
+
+    signingConfigs {
+        release {
+            if (ksFile.exists()) {
+                storeFile rootProject.file(ks['storeFile'])
+                storePassword ks['storePassword']
+                keyAlias ks['keyAlias']
+                keyPassword ks['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksFile.exists()) signingConfig signingConfigs.release
+        }
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-debug'
+        }
+    }
+
+    buildFeatures { buildConfig true }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+}

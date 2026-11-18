@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Кому доверяет приложение (и его WebView) при https.
+     + ISRG Root X1/X2 (Let's Encrypt, наш сертификат): в Android 7.0 их нет.
+     На Android 13 и старше в системе нет новых корневых сертификатов — например, GlobalSign Root R46,
+     которым подписан auth.robokassa.ru. Без него страница оплаты в приложении не открывалась.
+     raw/extra_roots.pem — корни, добавленные в Android 14+ (AOSP system/ca-certificates, ветка main,
+     которых нет в android12-release). Системные корни остаются как есть. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="@raw/extra_roots" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
