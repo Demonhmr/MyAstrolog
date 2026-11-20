@@ -294,7 +294,8 @@ public class MainActivity extends Activity {
     // ---------------------------------------------------------------- ссылки
 
     /** Свои адреса: текущий и будущий домен — чтобы после переезда сайта версия 1.0 не открывала его в браузере. */
-    private static final String[] HOSTS = { BuildConfig.SITE_HOST, "zvezditsa.ru" };
+    // старый адрес оставлен: ссылки на него редиректят на zvezditsa.ru и должны открываться внутри приложения
+    private static final String[] HOSTS = { BuildConfig.SITE_HOST, "zvezditsa.137-22-150-127.sslip.io" };
 
     private static boolean isSiteHost(Uri u) {
         String h = u.getHost();

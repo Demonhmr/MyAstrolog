@@ -1,7 +1,7 @@
 // Сквозная проверка приложения в Chromium с размером телефона.
 // node web/tools/e2e.js [адрес] [папка для скриншотов]
 const { chromium } = require('/tmp/pw-check/node_modules/playwright-core');
-const BASE = process.argv[2] || 'https://zvezditsa.137-22-150-127.sslip.io/app/';
+const BASE = process.argv[2] || 'https://zvezditsa.ru/app/';
 const OUT = process.argv[3] || require('os').tmpdir();
 const exe = require('os').homedir() + '/.cache/ms-playwright/chromium-1134/chrome-linux/chrome';
 

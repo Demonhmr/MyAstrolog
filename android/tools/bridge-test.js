@@ -3,7 +3,7 @@
 // node android/tools/bridge-test.js [адрес приложения]
 const fs = require('fs'), path = require('path');
 const { chromium } = require('/tmp/pw-check/node_modules/playwright-core');
-const BASE = process.argv[2] || 'https://zvezditsa.137-22-150-127.sslip.io/app/';
+const BASE = process.argv[2] || 'https://zvezditsa.ru/app/';
 const root = path.join(__dirname, '..');
 const bridge = fs.readFileSync(path.join(root, 'app/src/main/assets/bridge.js'), 'utf8');
 const java = fs.readFileSync(path.join(root, 'app/src/main/java/ru/zvezditsa/app/MainActivity.java'), 'utf8');
