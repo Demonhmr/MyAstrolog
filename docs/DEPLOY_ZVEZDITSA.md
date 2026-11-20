@@ -28,10 +28,15 @@ nano .env
 #   SUPPORT_CONTACT=<почта поддержки>
 #   PAYWALL_ENABLED=false               # включить, когда документы заполнены и опубликованы
 
-docker compose up -d --build
-docker compose logs -f --tail=30
+docker compose --profile bot up -d --build bot     # без --profile bot бот не стартует
+docker compose --profile bot logs -f --tail=30 bot
 # ждём строки: DB: /app/storage/zvezditsa.db · LLM: on (...) · Bot: @zvezditsa_bot
 ```
+
+Если после `LLM: ...` строка `Bot: @zvezditsa_bot` не появляется — бот не достучался до Telegram.
+С AdminVPS адрес `api.telegram.org` из DNS (149.154.166.110) заблокирован, поэтому в `docker-compose.yml`
+у бота закреплён рабочий 149.154.167.220 (`extra_hosts`). Если перестанет отвечать и он — подобрать другой:
+`curl --resolve api.telegram.org:443:<ip> https://api.telegram.org/bot0:x/getMe` → 401 значит адрес живой.
 
 База лежит в docker-томе `zvezditsa_zvezditsa_data` и переживает пересборку. Резервная копия:
 

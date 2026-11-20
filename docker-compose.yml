@@ -7,13 +7,18 @@ x-logging: &logging
     max-file: "3"
 
 services:
-  # Telegram-бот (отложен: запускать, когда в .env появится BOT_TOKEN)
+  # Telegram-бот: запуск `docker compose --profile bot up -d bot` (токен — BOT_TOKEN в .env)
   bot:
     build: .
     image: zvezditsa:latest
     container_name: zvezditsa_bot
     restart: unless-stopped
     profiles: ["bot"]
+    # Telegram Bot API: адрес из DNS (149.154.166.110) с AdminVPS не отвечает (блокировка в РФ),
+    # 149.154.167.220 отвечает (проверено 17.11 и 20.11.2026). Так же закреплено у n8n Волпеня.
+    # Проверить другой адрес: curl --resolve api.telegram.org:443:<ip> https://api.telegram.org/bot0:x/getMe → 401
+    extra_hosts:
+      - "api.telegram.org:149.154.167.220"
     env_file:
       - .env
     volumes:
