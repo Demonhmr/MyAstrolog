@@ -38,7 +38,7 @@ def support_contact() -> str:
 
 
 def terms_url() -> str:
-    return os.getenv("TERMS_URL", "https://zvezditsa.ru/oferta.html")
+    return os.getenv("TERMS_URL", "https://zvezditsa.ru/bot/oferta")
 
 
 async def _invoice_link(bot, plan: billing.Plan, user_id: int) -> str:

@@ -19,6 +19,16 @@ from bot.scheduler import reminder_loop  # noqa: E402
 from core import llm, storage  # noqa: E402
 
 
+def describe_message(text) -> str:
+    """Для журнала: команду пишем, остальной текст — только длину.
+    Ответы анкеты (даты, города) в журнал не попадают — так обещает политика бота."""
+    if not text:
+        return "non-text"
+    if text.startswith("/"):
+        return "cmd=" + text.split()[0][:32]
+    return f"text len={len(text)}"
+
+
 class LoggingMiddleware(BaseMiddleware):
     async def __call__(
         self,
@@ -28,8 +38,8 @@ class LoggingMiddleware(BaseMiddleware):
     ) -> Any:
         if isinstance(event, types.Update) and event.message:
             logging.info(
-                f"UPDATE {event.update_id}: "
-                f"user={event.message.from_user.id} text={event.message.text!r:.80}"
+                "UPDATE %s: user=%s %s",
+                event.update_id, event.message.from_user.id, describe_message(event.message.text),
             )
         return await handler(event, data)
 

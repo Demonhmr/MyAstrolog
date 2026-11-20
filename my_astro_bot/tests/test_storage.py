@@ -49,3 +49,11 @@ def test_story_cache_and_delete(db, profile):
     db.delete_user(42)
     assert db.get_profile(42) is None
     assert db.get_story(42, start) is None
+
+
+def test_set_consent(db, profile):
+    db.save_profile(replace(profile, consent_version="v1-2026-10-24", consent_at="2026-10-24T10:00:00"))
+    db.set_consent(42, "bot-v2-2026-11-21", "2026-11-21T09:00:00")
+    got = db.get_profile(42)
+    assert got.consent_version == "bot-v2-2026-11-21"
+    assert got.consent_at == "2026-11-21T09:00:00"

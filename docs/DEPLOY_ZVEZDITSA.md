@@ -53,8 +53,11 @@ docker run --rm -v zvezditsa_zvezditsa_data:/d -v /root:/b alpine cp /d/zvezdits
 
 ## 3. Лендинг zvezditsa.ru
 
-Статические файлы — папка `landing/`. На AdminVPS сайты заводятся в FASTPANEL (как volpen.ru):
-сайт `zvezditsa.ru` (+www), файлы из `landing/` — в его папку, SSL Let's Encrypt — кнопкой в панели.
-Чтобы работали адреса без `.html`, в `*.includes` сайта: `location / { try_files $uri $uri.html $uri/ =404; }`.
-DNS: A-записи домена на `137.22.150.127`.
-Ссылки на документы в боте по умолчанию: `https://zvezditsa.ru/privacy.html`, `/consent.html`, `/oferta.html`.
+Статические файлы — папка `landing/` → `/var/www/zvezditsa/site/` (вне FASTPANEL, свой nginx-конфиг
+`deploy/nginx-zvezditsa.conf`; адреса без `.html` работают через try_files). Домен на reg.ru, A-записи @ и www → `137.22.150.127`,
+сертификат certbot (webroot `/var/www/zvezditsa/acme`, имя `zvezditsa.ru`, продлевается сам).
+Документы бота — `landing/bot/` → https://zvezditsa.ru/bot/privacy, `/bot/consent`, `/bot/oferta` (ссылки по умолчанию в коде,
+переопределяются PRIVACY_URL / CONSENT_URL / TERMS_URL). Документы сайта и приложения — `landing/privacy.html`, `consent.html`.
+Выкладка документов: `scp -r landing/bot volpen:/var/www/zvezditsa/site/` (и `landing/privacy.html` при правке).
+Меняется смысл согласия бота — поднять `CONSENT_VERSION` в `bot/handlers/registration.py` (и версию на странице согласия):
+пользователи со старой версией примут его заново при /start или /forecast.

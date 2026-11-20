@@ -182,6 +182,16 @@ def set_reminders(user_id: int, on: bool) -> None:
         conn.commit()
 
 
+def set_consent(user_id: int, version: str, at_iso: str) -> None:
+    """Пользователь принял новую редакцию согласия на обработку данных."""
+    with closing(_connect()) as conn:
+        conn.execute(
+            "UPDATE users SET consent_version = ?, consent_at = ?, updated_at = ? WHERE user_id = ?",
+            (version, at_iso, _now_iso(), user_id),
+        )
+        conn.commit()
+
+
 def set_premium_until(user_id: int, until_utc: Optional[datetime]) -> None:
     with closing(_connect()) as conn:
         conn.execute(

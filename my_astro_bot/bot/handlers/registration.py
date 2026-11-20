@@ -30,6 +30,7 @@ UNKNOWN_TIME = "12:00"
 
 
 class Questionnaire(StatesGroup):
+    consent = State()
     birth_date = State()
     birth_time = State()
     birth_city = State()
@@ -41,25 +42,98 @@ def display_name(user: types.User) -> str:
     return html.escape(name[:40], quote=False)
 
 
-CONSENT_VERSION = "v1-2026-10-24"
+# Редакция согласия бота. Меняется — пользователи с другой версией принимают его заново (/start, /forecast).
+CONSENT_VERSION = "bot-v2-2026-11-21"
 
 
 def legal_links() -> str:
-    privacy = os.getenv("PRIVACY_URL", "https://zvezditsa.ru/privacy.html")
-    consent = os.getenv("CONSENT_URL", "https://zvezditsa.ru/consent.html")
-    return f'<a href="{privacy}">политика</a> и <a href="{consent}">согласие на обработку данных</a>'
+    privacy = os.getenv("PRIVACY_URL", "https://zvezditsa.ru/bot/privacy")
+    consent = os.getenv("CONSENT_URL", "https://zvezditsa.ru/bot/consent")
+    return f'<a href="{privacy}">политике</a> и <a href="{consent}">согласии на обработку данных</a>'
+
+
+def needs_consent(profile) -> bool:
+    return profile.consent_version != CONSENT_VERSION
+
+
+def consent_kb(yes_data: str):
+    kb = InlineKeyboardBuilder()
+    kb.button(text="✅ Согласен(на)", callback_data=yes_data)
+    kb.button(text="Не сейчас", callback_data="consent_no")
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+CONSENT_TEXT = (
+    "Чтобы посчитать прогноз, мне нужны дата, время и город рождения и город, где ты сейчас. "
+    "Я храню их на сервере в России, а прогнозы присылаю через Telegram (его серверы — за границей). "
+    "Подробно — в {links}.\n\n"
+    "Удалить данные и отозвать согласие можно в любой момент: /delete"
+)
 
 
 async def start_questionnaire(message: types.Message, state: FSMContext, user: types.User):
     await state.clear()
     await state.update_data(name=display_name(user))
     await message.answer(
-        "Когда ты родился(ась)? Напиши дату в формате <b>ДД.ММ.ГГГГ</b>, например 15.01.1990\n\n"
-        f"<i>Отвечая на вопросы, ты соглашаешься на обработку своих данных: {legal_links()}. "
-        "Удалить их можно в любой момент командой /delete.</i>",
-        parse_mode="HTML", disable_web_page_preview=True,
+        CONSENT_TEXT.format(links=legal_links()),
+        parse_mode="HTML", disable_web_page_preview=True, reply_markup=consent_kb("consent_yes"),
+    )
+    await state.set_state(Questionnaire.consent)
+
+
+async def ask_consent_again(message: types.Message):
+    """Профиль есть, но согласие принято в старой редакции."""
+    await message.answer(
+        "Я обновила документы о данных. " + CONSENT_TEXT.format(links=legal_links()),
+        parse_mode="HTML", disable_web_page_preview=True, reply_markup=consent_kb("consent_renew"),
+    )
+
+
+@router.callback_query(F.data == "consent_yes", StateFilter("*"))
+async def cb_consent_yes(callback: types.CallbackQuery, state: FSMContext):
+    # без фильтра по состоянию: после перезапуска бота состояние анкеты теряется, а кнопка остаётся
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await state.clear()
+    await state.update_data(
+        name=display_name(callback.from_user),
+        consent_at=utcnow_naive().isoformat(timespec="seconds"),
+    )
+    await callback.message.answer(
+        "Когда ты родился(ась)? Напиши дату в формате <b>ДД.ММ.ГГГГ</b>, например 15.01.1990",
+        parse_mode="HTML",
     )
     await state.set_state(Questionnaire.birth_date)
+
+
+@router.callback_query(F.data == "consent_renew", StateFilter("*"))
+async def cb_consent_renew(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    if not await asyncio.to_thread(storage.get_profile, callback.from_user.id):
+        await start_questionnaire(callback.message, state, callback.from_user)
+        return
+    await asyncio.to_thread(
+        storage.set_consent, callback.from_user.id, CONSENT_VERSION,
+        utcnow_naive().isoformat(timespec="seconds"),
+    )
+    await callback.message.answer("Спасибо! Твой прогноз: /forecast")
+
+
+@router.callback_query(F.data == "consent_no", StateFilter("*"))
+async def cb_consent_no(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    await callback.message.edit_reply_markup(reply_markup=None)
+    await state.clear()
+    await callback.message.answer(
+        "Хорошо. Без согласия я не смогу посчитать прогноз. Передумаешь — /start"
+    )
+
+
+@router.message(Questionnaire.consent)
+async def consent_pending(message: types.Message):
+    await message.answer("Сначала нажми «Согласен(на)» выше или «Не сейчас».")
 
 
 # ── 1. Дата рождения ──────────────────────────────────────────────────────────
@@ -213,7 +287,7 @@ async def finish(message: types.Message, state: FSMContext, user: types.User):
         reminders_on=old.reminders_on if old else True,
         premium_until=old.premium_until if old else None,
         consent_version=CONSENT_VERSION,
-        consent_at=utcnow_naive().isoformat(timespec="seconds"),
+        consent_at=data.get("consent_at") or utcnow_naive().isoformat(timespec="seconds"),
     )
     await asyncio.to_thread(storage.save_profile, profile)
     await message.answer("✨ Запомнила. Считаю твой личный месяц…")

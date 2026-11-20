@@ -11,7 +11,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot import delivery
-from bot.handlers.registration import start_questionnaire
+from bot.handlers.registration import ask_consent_again, needs_consent, start_questionnaire
 from core import storage
 
 router = Router()
@@ -58,6 +58,9 @@ async def _profile(user_id: int):
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     profile = await _profile(message.from_user.id)
+    if profile and needs_consent(profile):
+        await ask_consent_again(message)
+        return
     if profile:
         text = f"С возвращением, {profile.name}! ✨\nПоказать прогноз на твой текущий личный месяц?"
     else:
@@ -86,6 +89,9 @@ async def _send_current(message: types.Message, user: types.User, state: FSMCont
     profile = await _profile(user.id)
     if not profile:
         await start_questionnaire(message, state, user)
+        return
+    if needs_consent(profile):
+        await ask_consent_again(message)
         return
     await message.answer("✨ Считаю…")
     try:
