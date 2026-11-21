@@ -33,7 +33,7 @@ async def run_once(bot: Bot) -> int:
         try:
             f = await delivery.send_forecast(bot, profile, new_cycle=True)
             sent += 1
-            logger.info("Reminder sent: user=%s new cycle %s", profile.user_id, f.cycle_start_utc)
+            logger.info("Reminder sent: user=%s %s", profile.user_id, "full" if f else "locked")
         except TelegramForbiddenError:
             # пользователь заблокировал бота — больше не пишем
             await asyncio.to_thread(storage.set_reminders, profile.user_id, False)

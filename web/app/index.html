@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preload" href="assets/fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="assets/fonts/yeseva-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="app.css?v=2">
+<link rel="stylesheet" href="app.css?v=3">
 </head>
 <body>
 
@@ -21,9 +21,14 @@
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6z" fill="currentColor"/></svg>
     Звездица
   </a>
+  <nav class="bar-nav">
+  <a class="icon-btn" id="to-diary" href="#diary" aria-label="Дневник" hidden>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h11a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 19V5A1.5 1.5 0 0 1 6 3.5Zm2.5 0v17M11 8h4.5M11 11.5h4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </a>
   <a class="icon-btn" id="to-settings" href="#settings" aria-label="Настройки" hidden>
     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm7.4-2.5.1-1-.1-1 2-1.6-2-3.4-2.4 1a7.5 7.5 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.5 7.5 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.6-.1 1 .1 1-2 1.6 2 3.4 2.4-1c.5.4 1.1.8 1.7 1l.4 2.5h4l.4-2.5c.6-.2 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
   </a>
+  </nav>
 </header>
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -36,7 +41,8 @@
     <div class="stack">
       <p class="eyebrow">4 вопроса · около минуты</p>
       <h1 class="title" id="form-title">Узнай свой личный месяц</h1>
-      <p class="lead">Звездица считает его по дате, времени и месту рождения. Данные хранятся только на этом устройстве.</p>
+      <p class="lead" id="form-lead">Звездица считает его по дате, времени и месту рождения. Данные хранятся только на этом устройстве.</p>
+      <p class="note" id="form-locked" hidden>У тебя есть оплаченные месяцы, поэтому дату, время и город рождения меняет поддержка. Город, где ты сейчас, можно сменить.</p>
     </div>
 
     <form id="profile-form" class="stack-lg" novalidate>
@@ -115,6 +121,18 @@
     </div>
   </div>
 
+  <div class="wrap narrow stack-lg month-locked" id="m-locked" hidden>
+    <section class="card lock stack">
+      <p class="eyebrow" id="l-eyebrow">Месяц закрыт</p>
+      <h2 class="card-title" id="l-title">Прогноз на этот месяц — по тарифу</h2>
+      <p class="muted" id="l-text"></p>
+      <div class="row" id="l-actions">
+        <a class="btn" href="#plans" id="l-plans">Выбрать тариф</a>
+        <button class="btn ghost" id="l-prev">Прошлый месяц — бесплатно</button>
+      </div>
+    </section>
+  </div>
+
   <div class="wrap narrow stack-lg month-body" id="m-body" aria-busy="false">
     <div class="cards">
       <article class="card">
@@ -158,6 +176,12 @@
       <div id="m-expert" class="stack"></div>
     </details>
 
+    <section class="card stack" id="m-diary">
+      <div class="row between"><p class="eyebrow">Дневник этого месяца</p><a class="link" href="#diary" id="m-diary-add">Добавить запись</a></div>
+      <ul class="diary-mini" id="m-diary-list"></ul>
+      <p class="muted" id="m-diary-empty">Записывай, что происходит, — в конце месяца сверишь с прогнозом.</p>
+    </section>
+
     <section class="card next" id="m-next-card">
       <p class="eyebrow">Следующий личный месяц</p>
       <p class="card-title-sm" id="m-next-date"></p>
@@ -166,12 +190,115 @@
       </div>
     </section>
   </div>
+
+  <div class="wrap narrow month-periods" id="m-periods" hidden>
+    <section class="card stack">
+      <div class="row between"><p class="eyebrow">Твои личные месяцы</p><a class="link" href="#plans">Тарифы</a></div>
+      <ol class="periods" id="m-periods-list"></ol>
+    </section>
+  </div>
+</section>
+
+<!-- ── Дневник ────────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="diary" hidden>
+  <div class="wrap narrow stack-lg">
+    <div class="stack">
+      <h1 class="title">Дневник</h1>
+      <p class="lead">Записывай, что происходило: в конце месяца удобно сверить с прогнозом.</p>
+    </div>
+
+    <form id="diary-form" class="card stack" novalidate>
+      <p class="eyebrow" id="d-form-title">Новая запись</p>
+      <div class="field">
+        <label for="d-day">Дата</label>
+        <input id="d-day" type="date" required>
+      </div>
+      <div class="field">
+        <label for="d-text">Что было</label>
+        <textarea id="d-text" rows="4" maxlength="2000" placeholder="Например: сдала проект, поругалась с начальником, неожиданно позвонил старый друг"></textarea>
+        <p class="hint"><span id="d-count">0</span> / 2000</p>
+        <p class="err" id="d-err" hidden></p>
+      </div>
+      <div class="row">
+        <button class="btn" type="submit" id="d-save">Сохранить</button>
+        <button class="btn ghost" type="button" id="d-cancel" hidden>Отмена</button>
+      </div>
+    </form>
+
+    <p class="note" id="d-guest">Записи хранятся только на этом устройстве. <a href="#login" id="d-login">Войди по почте</a>, чтобы они были на всех устройствах и не потерялись.</p>
+    <p class="note" id="d-offline" hidden>Нет связи — показаны сохранённые записи, изменить их можно, когда связь вернётся.</p>
+
+    <div class="stack-lg" id="d-list"></div>
+    <p class="muted" id="d-empty">Пока ни одной записи.</p>
+  </div>
+</section>
+
+<!-- ── Вход ───────────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="login" hidden>
+  <div class="wrap narrow stack-lg">
+    <div class="stack">
+      <h1 class="title">Вход по почте</h1>
+      <p class="lead">Вход нужен, чтобы оплачивать прогнозы и хранить данные и дневник на всех устройствах. Пароля нет — пришлём код на почту.</p>
+    </div>
+    <form id="login-form" class="stack-lg" novalidate>
+      <div class="field" id="lg-email-box">
+        <label for="lg-email">Почта</label>
+        <input id="lg-email" type="email" inputmode="email" autocomplete="email" placeholder="name@mail.ru" maxlength="254">
+        <p class="err" id="lg-email-err" hidden></p>
+      </div>
+      <div class="field" id="lg-consent-box">
+        <label class="check consent"><input type="checkbox" id="lg-consent">
+          <span>Соглашаюсь на <a href="../consent.html" data-doc>обработку данных</a> и принимаю <a href="../privacy.html" data-doc>политику конфиденциальности</a></span>
+        </label>
+        <p class="err" id="lg-consent-err" hidden></p>
+      </div>
+      <div class="field" id="lg-code-box" hidden>
+        <label for="lg-code">Код из письма</label>
+        <input id="lg-code" inputmode="numeric" autocomplete="one-time-code" placeholder="6 цифр" maxlength="6">
+        <p class="hint" id="lg-code-hint"></p>
+        <p class="err" id="lg-code-err" hidden></p>
+      </div>
+      <div class="stack">
+        <button class="btn" type="submit" id="lg-submit">Получить код</button>
+        <button class="btn ghost" type="button" id="lg-resend" hidden>Отправить код ещё раз</button>
+        <button class="link" type="button" id="lg-change" hidden>Указать другую почту</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ── Тарифы ─────────────────────────────────────────────────────────── -->
+<section class="screen" data-screen="plans" hidden>
+  <div class="wrap narrow stack-lg">
+    <div class="stack">
+      <h1 class="title">Тарифы</h1>
+      <p class="lead">Прогноз считается на личный месяц — около 27 дней. Прошлый личный месяц всегда бесплатно.</p>
+    </div>
+    <p class="note" id="p-not-ready" hidden>Оплата скоро заработает. Пока можно посмотреть прошлый месяц бесплатно.</p>
+    <div class="plans" id="p-list"></div>
+    <ul class="fine plain">
+      <li>Оплаченные месяцы остаются у тебя навсегда.</li>
+      <li>Пакет начинается с текущего месяца. Уже оплаченные не сгорают — пакет продлевается за них.</li>
+      <li>Оплата разовая, без автопродления. Чек придёт на почту.</li>
+    </ul>
+    <p class="fine">Оплачивая, ты принимаешь <a href="../oferta.html" data-doc>условия оферты</a>.</p>
+  </div>
 </section>
 
 <!-- ── Настройки ──────────────────────────────────────────────────────── -->
 <section class="screen" data-screen="settings" hidden>
   <div class="wrap narrow stack-lg">
     <h1 class="title">Настройки</h1>
+
+    <section class="card stack" id="s-account">
+      <p class="eyebrow">Аккаунт</p>
+      <p id="s-account-text" class="muted">Ты не вошла(вошёл) в аккаунт: данные и дневник хранятся только на этом устройстве.</p>
+      <div class="row">
+        <a class="btn small" href="#login" id="s-login">Войти по почте</a>
+        <button class="btn ghost small" id="s-logout" hidden>Выйти</button>
+        <a class="btn ghost small" href="#plans" id="s-plans" hidden>Тарифы</a>
+      </div>
+    </section>
 
     <section class="card stack">
       <p class="eyebrow">Мои данные</p>
@@ -188,12 +315,19 @@
       <p class="eyebrow">Документы</p>
       <a href="../privacy.html" data-doc>Политика конфиденциальности</a>
       <a href="../consent.html" data-doc>Согласие на обработку данных</a>
+      <a href="../oferta.html" data-doc>Оферта</a>
     </section>
 
     <section class="card stack">
       <p class="eyebrow">Стереть данные</p>
-      <p class="muted">Удалит дату, время и города рождения и сохранённые прогнозы с этого устройства. На сервере они не хранятся.</p>
+      <p class="muted" id="s-erase-text">Удалит дату, время и города рождения, дневник и сохранённые прогнозы с этого устройства. На сервере они не хранятся.</p>
       <button class="btn danger small" id="s-erase">Стереть мои данные</button>
+    </section>
+
+    <section class="card stack" id="s-delete" hidden>
+      <p class="eyebrow">Удалить аккаунт</p>
+      <p class="muted">Удалит с сервера аккаунт, данные рождения, дневник и оплаченные месяцы. Записи об оплатах остаются без привязки к тебе — их требует налоговый учёт.</p>
+      <button class="btn danger small" id="s-delete-btn">Удалить аккаунт</button>
     </section>
 
     <p class="fine" id="s-version"></p>
@@ -202,6 +336,6 @@
 
 </main>
 
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

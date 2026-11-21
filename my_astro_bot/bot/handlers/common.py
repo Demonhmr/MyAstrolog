@@ -27,9 +27,12 @@ WELCOME_NEW = (
 HELP_TEXT = (
     "ℹ️ <b>Что я умею</b>\n\n"
     "/forecast — прогноз на текущий личный месяц\n"
+    "/previous — прошлый личный месяц (бесплатно)\n"
+    "/months — мои личные месяцы и что открыто\n"
+    "/diary — дневник: запиши, как прошёл день\n"
     "/profile — мои данные и их изменение\n"
     "/reminders — включить или выключить напоминания о новом месяце\n"
-    "/premium — Звездица+\n"
+    "/premium — тарифы\n"
     "/paysupport — вопросы по оплате\n"
     "/delete — удалить мои данные\n\n"
     "<b>Как это работает.</b> Я нахожу момент, когда Луна возвращается в точку твоего "
@@ -112,14 +115,22 @@ async def cb_forecast(callback: types.CallbackQuery, state: FSMContext):
     await _send_current(callback.message, callback.from_user, state)
 
 
-@router.callback_query(F.data == "expert")
+@router.callback_query(F.data.startswith("expert"))
 async def cb_expert(callback: types.CallbackQuery):
     await callback.answer()
     profile = await _profile(callback.from_user.id)
     if not profile:
         await callback.message.answer("Сначала ответь на вопросы: /start")
         return
-    await callback.message.answer(await delivery.expert_text(profile), parse_mode="HTML")
+    try:
+        index = int(callback.data.split(":")[1]) if ":" in callback.data else 0   # старые кнопки — текущий
+    except ValueError:
+        index = 0
+    text = await delivery.expert_text(profile, max(-1, min(index, 1)))
+    if text is None:
+        await callback.message.answer("Этот месяц закрыт. Тарифы: /premium")
+        return
+    await callback.message.answer(text, parse_mode="HTML")
 
 
 @router.message(Command("profile"), StateFilter("*"))
@@ -162,7 +173,7 @@ async def cmd_delete(message: types.Message):
     kb.button(text="Да, удалить", callback_data="delete_yes")
     kb.button(text="Отмена", callback_data="delete_no")
     await message.answer(
-        "Удалить твои данные и все прогнозы? Это нельзя отменить.",
+        "Удалить твои данные, прогнозы, дневник и оплаченные месяцы? Это нельзя отменить.",
         reply_markup=kb.as_markup(),
     )
 
@@ -172,7 +183,7 @@ async def cb_delete_yes(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     await state.clear()
     await asyncio.to_thread(storage.delete_user, callback.from_user.id)
-    await callback.message.edit_text("Готово: твои данные и прогнозы удалены. Вернуться можно в любой момент: /start")
+    await callback.message.edit_text("Готово: твои данные, прогнозы и дневник удалены. Вернуться можно в любой момент: /start")
 
 
 @router.callback_query(F.data == "delete_no")

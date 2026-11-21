@@ -13,16 +13,22 @@ def test_save_and_get_profile(db, profile):
     assert db.get_profile(999) is None
 
 
-def test_update_keeps_premium(db, profile):
+def test_update_profile(db, profile):
     db.save_profile(profile)
-    until = datetime(2030, 1, 1)
-    db.set_premium_until(42, until)
-    db.save_profile(replace(profile, cur_city="Казань", premium_until=None))
-    got = db.get_profile(42)
-    assert got.cur_city == "Казань"
-    assert got.premium_until == until.isoformat(timespec="seconds")
-    assert got.is_premium(now=datetime(2029, 1, 1))
-    assert not got.is_premium(now=datetime(2031, 1, 1))
+    db.save_profile(replace(profile, cur_city="Казань"))
+    assert db.get_profile(42).cur_city == "Казань"
+
+
+def test_delete_user_removes_diary_and_grants_keeps_payments(db, profile):
+    from core import webstore
+    db.save_profile(profile)
+    webstore.diary_put("t:42", "abcdef12", "2026-11-20", "запись")
+    db.record_stars_payment(42, "one", 100, "XTR", "ch-x",
+                            lambda c: webstore.add_grants(c, "t:42", [], "one", "tg:ch-x", False))
+    webstore.grant_cycles("t:42", [], "one", "x", False)
+    db.delete_user(42)
+    assert webstore.diary_list("t:42") == [] and webstore.grants_of("t:42") == []
+    assert len(db.payments_of(42)) == 1
 
 
 def test_due_profiles(db, profile):

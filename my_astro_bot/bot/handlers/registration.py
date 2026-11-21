@@ -20,7 +20,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from bot import delivery
-from core import storage
+from core import storage, webstore
 from core.astrology import utcnow_naive
 from core.geocoder import geocode_city
 
@@ -43,7 +43,7 @@ def display_name(user: types.User) -> str:
 
 
 # Редакция согласия бота. Меняется — пользователи с другой версией принимают его заново (/start, /forecast).
-CONSENT_VERSION = "bot-v2-2026-11-21"
+CONSENT_VERSION = "bot-v3-2026-11-21"
 
 
 def legal_links() -> str:
@@ -74,6 +74,24 @@ CONSENT_TEXT = (
 
 async def start_questionnaire(message: types.Message, state: FSMContext, user: types.User):
     await state.clear()
+    old = await asyncio.to_thread(storage.get_profile, user.id)
+    if old and not needs_consent(old) and await asyncio.to_thread(webstore.has_grants, webstore.tg_owner(user.id)):
+        # оплаченные месяцы привязаны к дате, времени и месту рождения — их меняет поддержка
+        await state.update_data(
+            name=display_name(user), consent_at=old.consent_at,
+            birth_date=old.birth_date, birth_time=old.birth_time, time_known=old.time_known,
+            birth_city=old.birth_city, birth_lat=old.birth_lat, birth_lon=old.birth_lon,
+            birth_utc_offset=old.birth_utc_offset, birth_tz=old.birth_tz,
+        )
+        kb = InlineKeyboardBuilder()
+        kb.button(text="В городе рождения", callback_data="same_city")
+        await message.answer(
+            "У тебя есть оплаченные месяцы, поэтому дату, время и город рождения меняет поддержка: /paysupport\n\n"
+            "Город, где ты сейчас, можно сменить. Где ты сейчас живёшь?",
+            reply_markup=kb.as_markup(),
+        )
+        await state.set_state(Questionnaire.current_city)
+        return
     await state.update_data(name=display_name(user))
     await message.answer(
         CONSENT_TEXT.format(links=legal_links()),

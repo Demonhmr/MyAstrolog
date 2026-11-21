@@ -3,6 +3,7 @@ package ru.zvezditsa.app;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -56,7 +57,8 @@ public class MainActivity extends Activity {
         " var h=location.hash.slice(1), p=false;" +
         " try{p=!!localStorage.getItem('zv.profile');}catch(e){}" +
         " var ex=document.querySelector('details.expert[open]');" +
-        " if(h==='settings'){location.hash='#month';return 'h';}" +
+        " if(h==='settings'||h==='diary'||h==='plans'){location.hash='#month';return 'h';}" +
+        " if(h==='login'){location.hash='#settings';return 'h';}" +
         " if(h==='form'&&p){location.hash='#settings';return 'h';}" +
         " if(ex&&h!=='form'){ex.open=false;return 'h';}" +
         " var now=document.getElementById('m-now');" +
@@ -73,6 +75,8 @@ public class MainActivity extends Activity {
     private View statusBg, navBg;
     private String bridgeJs = "";
     private boolean loadFailed;
+    private String lastPayUrl;    // последняя открытая страница оплаты Robokassa
+    private boolean payInBrowser; // оплата ушла в браузер — по возвращении проверить счёт
 
     // ---------------------------------------------------------------- запуск
 
@@ -104,6 +108,11 @@ public class MainActivity extends Activity {
         super.onResume();
         web.onResume();
         if (docWeb != null) docWeb.onResume();
+        if (payInBrowser) {   // вернулись из браузера после оплаты: приложение покажет «Проверяем оплату…»
+            payInBrowser = false;
+            closeDoc();
+            web.loadUrl(BuildConfig.START_URL + "?pay=check#month");
+        }
     }
     @Override protected void onPause() { web.onPause(); if (docWeb != null) docWeb.onPause(); super.onPause(); }
     @Override protected void onSaveInstanceState(Bundle out) { super.onSaveInstanceState(out); web.saveState(out); }
@@ -309,6 +318,11 @@ public class MainActivity extends Activity {
         return "https".equals(u.getScheme()) && isSiteHost(u) && p != null && p.startsWith("/app");
     }
 
+    private static boolean isPaymentHost(Uri u) {
+        String h = u.getHost();
+        return h != null && (h.endsWith("robokassa.ru") || h.endsWith("robokassa.com"));
+    }
+
     private void openDoc(String url) {
         if (docWeb == null) {
             docWeb = makeWebView(false);
@@ -326,7 +340,20 @@ public class MainActivity extends Activity {
 
     private boolean openExternal(Uri uri) {
         try {
-            Intent i = new Intent(Intent.ACTION_VIEW, uri);
+            Intent i;
+            if ("intent".equals(uri.getScheme())) {   // ссылки банков из СБП и т. п. (как в Волпене)
+                i = Intent.parseUri(uri.toString(), Intent.URI_INTENT_SCHEME);
+                i.addCategory(Intent.CATEGORY_BROWSABLE);
+                i.setComponent(null);
+                i.setSelector(null);
+                try { startActivity(i); return true; } catch (ActivityNotFoundException e) {
+                    String fb = i.getStringExtra("browser_fallback_url");
+                    if (fb == null) throw e;
+                    i = new Intent(Intent.ACTION_VIEW, Uri.parse(fb));
+                }
+            } else {
+                i = new Intent(Intent.ACTION_VIEW, uri);
+            }
             i.addCategory(Intent.CATEGORY_BROWSABLE);
             startActivity(i);
             return true;
@@ -340,14 +367,23 @@ public class MainActivity extends Activity {
     private boolean route(WebView view, WebResourceRequest req) {
         Uri u = req.getUrl();
         String scheme = u.getScheme();
-        if (!"http".equals(scheme) && !"https".equals(scheme)) { openExternal(u); return true; }   // mailto: и т. п.
+        if (!"http".equals(scheme) && !"https".equals(scheme)) { openExternal(u); return true; }   // mailto:, intent:, банки
         if (view == docWeb) {
             if (isAppUrl(u)) { closeDoc(); return true; }      // «← В приложение» со страницы документа
             if (isSiteHost(u)) return false;
             openExternal(u); return true;
         }
         if (isAppUrl(u)) return false;
-        if (isSiteHost(u)) { openDoc(u.toString()); return true; }   // политика, согласие — поверх приложения
+        if (isSiteHost(u)) {
+            String p = u.getPath();
+            if (p != null && p.startsWith("/app")) return false;   // возврат с оплаты (/app/pay-ok)
+            openDoc(u.toString()); return true;                     // политика, согласие, оферта — поверх приложения
+        }
+        if (isPaymentHost(u)) { lastPayUrl = u.toString(); return false; }   // страница оплаты — внутри
+        // уже ушли из приложения на оплату: страницы банка (3-D Secure, СБП) — тоже внутри,
+        // иначе форма банка ушла бы в браузер без своих данных
+        String cur = view.getUrl();
+        if (cur != null && cur.startsWith("http") && !isAppUrl(Uri.parse(cur))) return false;
         if (!req.hasGesture() || req.isRedirect()) return false;
         openExternal(u); return true;   // чужие сайты — в браузере
     }
@@ -376,8 +412,18 @@ public class MainActivity extends Activity {
         }
 
         /** Сертификат не прошёл проверку — такую страницу никогда не открываем. */
+        /** Сертификат не прошёл проверку — такую страницу никогда не открываем. Если это оплата —
+         *  открываем её в браузере телефона, а когда человек вернётся, приложение проверит счёт. */
         @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
             handler.cancel();
+            String url = error.getUrl();
+            if (url == null || !isPaymentHost(Uri.parse(url)) || payInBrowser) return;
+            Uri target = Uri.parse(lastPayUrl != null ? lastPayUrl : url);
+            if (openExternal(target)) {
+                payInBrowser = true;
+                Toast.makeText(MainActivity.this, R.string.pay_in_browser, Toast.LENGTH_LONG).show();
+            }
+            if (!isAppUrl(Uri.parse(String.valueOf(view.getUrl())))) view.loadUrl(BuildConfig.START_URL + "#plans");
         }
 
         private void inject(WebView view, String url) {

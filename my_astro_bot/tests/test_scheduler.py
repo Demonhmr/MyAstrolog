@@ -52,10 +52,25 @@ def test_blocked_user_turns_reminders_off(db, profile, monkeypatch):
     assert db.get_profile(42).reminders_on is False
 
 
-def test_paywall_sends_teaser(db, profile, monkeypatch):
+def test_paywall_locks_current_but_not_previous(db, profile, monkeypatch):
     _setup(db, profile, monkeypatch)
     monkeypatch.setenv("PAYWALL_ENABLED", "true")
     bot = FakeBot()
-    asyncio.run(delivery.send_forecast(bot, db.get_profile(42)))
-    assert any("Звездице+" in m for m in bot.messages)
-    assert not any("Как ты хочешь" in m for m in bot.messages)
+    assert asyncio.run(delivery.send_forecast(bot, db.get_profile(42))) is None
+    assert any("/premium" in m and "/previous" in m for m in bot.messages)
+    assert not any("Как ты хочешь" in m for m in bot.messages) and not bot.photos
+    # напоминание о следующем месяце всё равно назначено
+    assert db.get_profile(42).next_cycle_utc > utcnow_naive().isoformat()
+
+    bot = FakeBot()
+    asyncio.run(delivery.send_forecast(bot, db.get_profile(42), index=-1))
+    assert "прошлый личный месяц" in bot.messages[0]
+    assert any("Как ты хочешь" in m for m in bot.messages) and len(bot.photos) == 1
+
+
+def test_reminder_with_paywall_is_locked_message(db, profile, monkeypatch):
+    _setup(db, profile, monkeypatch)
+    monkeypatch.setenv("PAYWALL_ENABLED", "true")
+    bot = FakeBot()
+    assert asyncio.run(scheduler.run_once(bot)) == 1
+    assert "Начался твой новый личный месяц" in bot.messages[0] and "/premium" in bot.messages[0]

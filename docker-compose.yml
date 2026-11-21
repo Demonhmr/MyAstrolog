@@ -28,17 +28,21 @@ services:
       - matplotlib_cache:/root/.cache/matplotlib
     logging: *logging
 
-  # Сервер расчёта для сайта и Android: ничего не хранит, наружу — через nginx /api/
+  # Сервер приложения для сайта и Android, наружу — через nginx /api/.
+  # Сеть хоста: письма с кодом входа уходят через exim этого VPS (127.0.0.1:25 принимает без пароля),
+  # поэтому uvicorn слушает только 127.0.0.1:8090. База — та же, что у бота (том zvezditsa_data).
   api:
     build: .
     image: zvezditsa:latest
     container_name: zvezditsa_api
     restart: unless-stopped
-    command: ["uvicorn", "api.app:app", "--host", "0.0.0.0", "--port", "8090", "--no-access-log"]
-    ports:
-      - "127.0.0.1:8090:8090"
+    network_mode: host
+    command: ["uvicorn", "api.app:app", "--host", "127.0.0.1", "--port", "8090", "--no-access-log"]
+    env_file:
+      - .env
     mem_limit: 700m
     volumes:
+      - zvezditsa_data:/app/storage
       - matplotlib_cache:/root/.cache/matplotlib
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/api/health', timeout=3)"]

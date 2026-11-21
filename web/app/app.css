@@ -151,3 +151,44 @@ input:disabled{opacity:.5}
   .cards,.versus{grid-template-columns:1fr}
   body{font-size:16px}
 }
+
+/* шапка: дневник и настройки */
+.bar-nav{display:flex;gap:4px}
+.between{justify-content:space-between}
+
+/* закрытый месяц и список месяцев */
+.month-locked{padding-top:28px}
+.lock{background:var(--gold-soft);border-color:#f0c35a55}
+.month-periods{padding-bottom:8px}
+.periods{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.period{display:flex;width:100%;justify-content:space-between;align-items:center;gap:12px;text-align:left;cursor:pointer;
+  background:var(--night);border:1px solid var(--line);border-radius:12px;padding:10px 14px;color:var(--moon)}
+.period:hover{border-color:var(--moon-faint)}
+.period.on{border-color:var(--gold);box-shadow:0 0 0 2px #f0c35a33}
+.p-dates{font-weight:600}
+.p-st{font-size:.86rem;color:var(--moon-faint);text-align:right}
+.period.paid .p-st,.period.free .p-st,.period.open .p-st{color:var(--gold)}
+.period.closed{opacity:.6}
+
+/* дневник */
+textarea{width:100%;min-height:110px;resize:vertical;background:var(--night-2);color:var(--moon);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;font:inherit;font-size:1.02rem;line-height:1.5}
+textarea:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px #f0c35a26}
+input[type=date],input[type=email]{width:100%;min-height:50px;background:var(--night-2);color:var(--moon);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;font:inherit;font-size:1.05rem}
+input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.8)}
+.title-3{font-family:var(--f-body);font-weight:700;font-size:1rem;color:var(--gold);letter-spacing:.02em}
+.entry{background:var(--night-2);border:1px solid var(--line);border-radius:14px;padding:12px 16px;display:flex;flex-direction:column;gap:4px}
+.entry-day{font-size:.86rem;color:var(--moon-faint);font-weight:600}
+.entry-text{white-space:pre-wrap;overflow-wrap:anywhere}
+.entry-actions{gap:18px;margin-top:4px}
+.danger-link{color:var(--danger)}
+.diary-mini{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.diary-mini .entry{background:var(--night)}
+
+/* тарифы */
+.plans{display:flex;flex-direction:column;gap:14px}
+.plan .btn{align-self:flex-start;margin-top:6px}
+.plan.best{border-color:var(--gold);background:linear-gradient(180deg,#3a301655,var(--night-2))}
+.price{font-family:var(--f-display);font-size:1.5rem;color:var(--gold);white-space:nowrap}
+.plain{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:4px}

@@ -163,3 +163,7 @@ body.doc footer a{color:var(--ink-dim)}
 .cta-row.center{justify-content:center}
 .tiers.one{grid-template-columns:minmax(0,520px)}
 body.doc .top .doc-back{color:#8a5d06;text-decoration:none;font-size:.95rem}
+.prices{list-style:none;padding:0!important}
+.prices li{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:8px 0}
+.prices b{font-family:var(--f-display);font-weight:400;color:var(--gold);white-space:nowrap}
+.note-inline{color:var(--gold);font-weight:600}

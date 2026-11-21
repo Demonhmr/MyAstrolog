@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS users (
     cur_tz            TEXT    NOT NULL,
     next_cycle_utc    TEXT,                      -- начало следующего личного месяца (UTC, ISO)
     reminders_on      INTEGER NOT NULL DEFAULT 1,
-    premium_until     TEXT,                      -- UTC ISO; NULL — бесплатный доступ
+    premium_until     TEXT,                      -- не используется (была подписка до 21.11.2026)
     consent_version   TEXT,                      -- версия принятого согласия на обработку ПД
     consent_at        TEXT,                      -- когда принято (UTC ISO)
     created_at        TEXT    NOT NULL,
@@ -58,12 +58,12 @@ CREATE INDEX IF NOT EXISTS idx_users_due ON users (reminders_on, next_cycle_utc)
 CREATE TABLE IF NOT EXISTS payments (
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id            INTEGER NOT NULL,
-    plan               TEXT    NOT NULL,         -- month | year
+    plan               TEXT    NOT NULL,         -- код тарифа core/plans.py
     amount             INTEGER NOT NULL,         -- в Stars
     currency           TEXT    NOT NULL,         -- XTR
     charge_id          TEXT    NOT NULL UNIQUE,  -- telegram_payment_charge_id (нужен для возврата)
     is_recurring       INTEGER NOT NULL DEFAULT 0,
-    premium_until      TEXT    NOT NULL,
+    premium_until      TEXT    NOT NULL,         -- пусто (было окончание подписки)
     created_at         TEXT    NOT NULL
 );
 """
@@ -88,15 +88,9 @@ class Profile:
     cur_tz: str
     next_cycle_utc: Optional[str] = None
     reminders_on: bool = True
-    premium_until: Optional[str] = None
+    premium_until: Optional[str] = None      # от старой подписки (не используется; доступ — в grants)
     consent_version: Optional[str] = None
     consent_at: Optional[str] = None
-
-    def is_premium(self, now: Optional[datetime] = None) -> bool:
-        if not self.premium_until:
-            return False
-        now = now or utcnow_naive()
-        return datetime.fromisoformat(self.premium_until) > now
 
 
 _PROFILE_FIELDS = [f.name for f in fields(Profile)]
@@ -109,14 +103,21 @@ def db_path() -> Path:
 def _connect() -> sqlite3.Connection:
     path = db_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(path)
+    # Базу открывают два контейнера (бот и сервер приложения): ждём чужую запись, а не падаем
+    conn = sqlite3.connect(path, timeout=10)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 10000")
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 def init_db() -> None:
+    from core import webstore  # таблицы аккаунтов сайта, оплаченных месяцев и дневника
     with closing(_connect()) as conn:
+        conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        conn.executescript(webstore.SCHEMA)
+        webstore.migrate(conn)
         conn.commit()
 
 
@@ -157,8 +158,12 @@ def get_profile(user_id: int) -> Optional[Profile]:
 
 
 def delete_user(user_id: int) -> None:
-    """Удаляет профиль и все прогнозы пользователя (по его запросу)."""
+    """Удаляет профиль, прогнозы и дневник пользователя (по его запросу).
+    Оплаченные месяцы удаляются тоже; записи о платежах остаются (учёт дохода)."""
+    owner = f"t:{user_id}"
     with closing(_connect()) as conn:
+        conn.execute("DELETE FROM diary WHERE owner = ?", (owner,))
+        conn.execute("DELETE FROM grants WHERE owner = ?", (owner,))
         conn.execute("DELETE FROM forecasts WHERE user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
         conn.commit()
@@ -192,43 +197,31 @@ def set_consent(user_id: int, version: str, at_iso: str) -> None:
         conn.commit()
 
 
-def set_premium_until(user_id: int, until_utc: Optional[datetime]) -> None:
-    with closing(_connect()) as conn:
-        conn.execute(
-            "UPDATE users SET premium_until = ?, updated_at = ? WHERE user_id = ?",
-            (until_utc.isoformat(timespec="seconds") if until_utc else None, _now_iso(), user_id),
-        )
-        conn.commit()
-
-
-def record_payment(user_id: int, plan: str, amount: int, currency: str, charge_id: str,
-                   is_recurring: bool, premium_until: datetime) -> bool:
+def record_stars_payment(user_id: int, plan: str, amount: int, currency: str, charge_id: str, grant_fn) -> Optional[int]:
     """
-    Записывает платёж и продлевает подписку одной транзакцией.
-    Возвращает False, если этот платёж уже учтён (повторная доставка от Telegram).
+    Записывает оплату звёздами и выдаёт месяцы одной транзакцией.
+    grant_fn(conn) → сколько месяцев выдано. None — этот платёж уже учтён (повторная доставка от Telegram).
     """
-    until = premium_until.isoformat(timespec="seconds")
     with closing(_connect()) as conn:
+        conn.execute("BEGIN IMMEDIATE")
         try:
             conn.execute(
                 "INSERT INTO payments (user_id, plan, amount, currency, charge_id, is_recurring, "
-                "premium_until, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (user_id, plan, amount, currency, charge_id, int(is_recurring), until, _now_iso()),
+                "premium_until, created_at) VALUES (?, ?, ?, ?, ?, 0, '', ?)",
+                (user_id, plan, amount, currency, charge_id, _now_iso()),
             )
         except sqlite3.IntegrityError:
-            return False
-        conn.execute(
-            "UPDATE users SET premium_until = ?, updated_at = ? WHERE user_id = ?",
-            (until, _now_iso(), user_id),
-        )
+            conn.rollback()
+            return None
+        n = grant_fn(conn)
         conn.commit()
-    return True
+    return n
 
 
 def payments_of(user_id: int) -> list:
     with closing(_connect()) as conn:
         rows = conn.execute(
-            "SELECT plan, amount, currency, charge_id, premium_until, created_at "
+            "SELECT plan, amount, currency, charge_id, created_at "
             "FROM payments WHERE user_id = ? ORDER BY id", (user_id,),
         ).fetchall()
     return [dict(r) for r in rows]

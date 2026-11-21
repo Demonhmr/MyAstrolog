@@ -1,8 +1,8 @@
 /* Звездица — сервис-воркер: приложение открывается без интернета.
    При изменении файлов приложения увеличьте VERSION (и ?v= у app.css, app.js в index.html). */
-var VERSION = 'zv-v2';
+var VERSION = 'zv-v3';
 var SHELL = [
-  './', 'index.html', 'app.css?v=2', 'app.js?v=2', 'manifest.webmanifest',
+  './', 'index.html', 'app.css?v=3', 'app.js?v=3', 'manifest.webmanifest',
   'assets/fonts/onest-cyrillic.woff2', 'assets/fonts/onest-latin.woff2',
   'assets/fonts/yeseva-cyrillic.woff2', 'assets/fonts/yeseva-latin.woff2',
   'icons/favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'

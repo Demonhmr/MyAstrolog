@@ -5,6 +5,15 @@ import pytest
 from core import storage
 
 
+@pytest.fixture(autouse=True)
+def _isolated_db(tmp_path, monkeypatch):
+    """Каждый тест — со своей пустой базой; платный доступ и оплата выключены, пока тест не включит."""
+    monkeypatch.setenv("DB_PATH", str(tmp_path / "auto.db"))
+    for k in ("WEB_PAYWALL", "PAYWALL_TEST_EMAILS", "RK_LOGIN", "RK_PASS1", "RK_PASS2",
+              "RK_TEST_PASS1", "RK_TEST_PASS2", "RK_TEST", "TEST_LOGIN_CODE", "PAYWALL_ENABLED"):
+        monkeypatch.delenv(k, raising=False)
+
+
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     monkeypatch.setenv("DB_PATH", str(tmp_path / "test.db"))

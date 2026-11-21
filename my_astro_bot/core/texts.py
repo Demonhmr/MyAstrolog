@@ -11,6 +11,8 @@ texts.py — тексты Звездицы для людей (Telegram HTML).
 import html
 import re
 
+import pytz
+
 from core.forecast import Forecast
 
 MONTHS_GEN = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
@@ -153,9 +155,14 @@ def time_warning(f: Forecast) -> str:
     )
 
 
-def render_summary(f: Forecast, *, new_cycle: bool = False) -> str:
+def month_title(index: int) -> str:
+    return {-1: "Твой прошлый личный месяц", 0: "Твой личный месяц",
+            1: "Твой следующий личный месяц"}.get(index, "Твой личный месяц")
+
+
+def render_summary(f: Forecast, *, new_cycle: bool = False, index: int = 0) -> str:
     """Первое сообщение: даты личного месяца, роль и главная задача."""
-    head = "🌙 <b>Начался твой новый личный месяц!</b>" if new_cycle else "🌙 <b>Твой личный месяц</b>"
+    head = "🌙 <b>Начался твой новый личный месяц!</b>" if new_cycle else f"🌙 <b>{month_title(index)}</b>"
     return (
         f"{head}\n"
         f"{LINE}\n"
@@ -316,9 +323,40 @@ def render_expert(f: Forecast) -> str:
     )
 
 
-def render_teaser() -> str:
+def _local(dt_utc, tz: str):
+    return pytz.utc.localize(dt_utc).astimezone(pytz.timezone(tz))
+
+
+def render_locked(cycle, tz: str, city: str, status: str, *, new_cycle: bool = False) -> str:
+    """Месяц закрыт: только даты и что делать дальше."""
+    s, e = _local(cycle.start, tz), _local(cycle.end, tz)
+    if status == "paid_later":
+        tail = f"Этот месяц оплачен ✅ Прогноз откроется {fmt_dt(s)}."
+    elif status == "closed":
+        tail = "Этот месяц уже прошёл и не был открыт. Бесплатно доступен только прошлый месяц: /previous"
+    else:
+        tail = ("🔒 Прогноз на этот месяц — по тарифу: /premium\n"
+                "Прошлый личный месяц можно посмотреть бесплатно: /previous")
+    head = "🌙 <b>Начался твой новый личный месяц!</b>" if new_cycle else f"🌙 <b>{month_title(cycle.index)}</b>"
     return (
-        "🔒 <b>Полный разбор — в Звездице+</b>\n"
-        "Живой разбор «как хочешь / как будет» и то, как начнётся "
-        "и чем закончится твой месяц. /premium"
+        f"{head}\n{LINE}\n"
+        f"📅 <b>{fmt_dt(s)} — {fmt_dt(e)}</b>\n"
+        f"<i>по времени: {esc(city)}</i>\n\n{tail}"
     )
+
+
+STATUS_LABEL = {
+    "open": "открыт", "free": "бесплатно", "paid": "оплачен ✅", "paid_later": "оплачен, откроется в начале",
+    "locked": "🔒 закрыт", "closed": "прошёл",
+}
+
+
+def render_months(items, tz: str) -> str:
+    lines = ["🗓 <b>Твои личные месяцы</b>", LINE]
+    for c, st in items:
+        s, e = _local(c.start, tz), _local(c.end, tz)
+        mark = " ← сейчас" if c.index == 0 else ""
+        lines.append(f"{fmt_date(s)} — {fmt_date(e)}: {STATUS_LABEL.get(st, st)}{mark}")
+    lines.append("")
+    lines.append("Прошлый месяц: /previous · Текущий: /forecast · Тарифы: /premium")
+    return "\n".join(lines)

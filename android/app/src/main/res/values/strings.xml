@@ -8,6 +8,7 @@
     <string name="offline_title">Нет связи со Звездицей</string>
     <string name="offline_text">Проверьте интернет и попробуйте ещё раз.\nПосле первого прогноза Звездица открывается и без сети.</string>
     <string name="retry">Повторить</string>
+    <string name="pay_in_browser">Открываем оплату в браузере. После оплаты вернитесь в Звездицу — она проверит счёт</string>
     <string name="channel_name">Новый личный месяц</string>
     <string name="channel_desc">Напоминание, когда начинается ваш новый личный месяц</string>
     <string name="notif_title">Начался твой новый личный месяц</string>

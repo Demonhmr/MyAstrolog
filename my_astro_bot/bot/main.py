@@ -14,7 +14,7 @@ from aiogram.types import BotCommand
 
 load_dotenv()
 
-from bot.handlers import common, payments, registration  # noqa: E402  (после load_dotenv)
+from bot.handlers import common, diary, payments, registration  # noqa: E402  (после load_dotenv)
 from bot.scheduler import reminder_loop  # noqa: E402
 from core import llm, storage  # noqa: E402
 
@@ -25,6 +25,7 @@ def describe_message(text) -> str:
     if not text:
         return "non-text"
     if text.startswith("/"):
+        # только команда: текст после неё (запись дневника) в журнал не пишем
         return "cmd=" + text.split()[0][:32]
     return f"text len={len(text)}"
 
@@ -46,9 +47,12 @@ class LoggingMiddleware(BaseMiddleware):
 
 COMMANDS = [
     BotCommand(command="forecast", description="Прогноз на мой личный месяц"),
+    BotCommand(command="previous", description="Прошлый месяц — бесплатно"),
+    BotCommand(command="months", description="Мои личные месяцы"),
+    BotCommand(command="diary", description="Дневник"),
     BotCommand(command="profile", description="Мои данные"),
     BotCommand(command="reminders", description="Напоминания о новом месяце"),
-    BotCommand(command="premium", description="Звездица+"),
+    BotCommand(command="premium", description="Тарифы"),
     BotCommand(command="help", description="Что умеет Звездица"),
     BotCommand(command="paysupport", description="Вопросы по оплате"),
     BotCommand(command="delete", description="Удалить мои данные"),
@@ -80,6 +84,7 @@ async def main():
     dp = Dispatcher(storage=MemoryStorage())
     dp.update.outer_middleware(LoggingMiddleware())
     dp.include_router(payments.router)
+    dp.include_router(diary.router)
     dp.include_router(common.router)
     dp.include_router(registration.router)
 
