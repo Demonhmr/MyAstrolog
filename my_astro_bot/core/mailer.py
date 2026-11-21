@@ -4,6 +4,11 @@ mailer.py — письма с кодом входа.
 Отправка через почтовый сервер на этом же VPS (exim, 127.0.0.1:25 без пароля, как у Волпеня):
 exim подписывает письмо DKIM по домену отправителя (/etc/exim4/dkim/zvezditsa.ru.private).
 Контейнер сервера приложения работает в сети хоста, поэтому 127.0.0.1 — это exim.
+
+Конверт (MAIL FROM) — MAIL_ENVELOPE_FROM, по умолчанию как From. На этом VPS exim проверяет отправителя,
+а zvezditsa.ru указывает на сам сервер и почтовым доменом exim не заведён → «sender verify defer».
+Поэтому в .env MAIL_ENVELOPE_FROM=no-reply@volpen.ru (адрес exim знает, SPF volpen.ru включает этот IP);
+в заголовке From остаётся no-reply@zvezditsa.ru, DKIM ставится по домену From.
 """
 
 import logging
@@ -36,7 +41,7 @@ def send_login_code(email: str, code: str) -> bool:
     port = int(os.getenv("MAIL_PORT", "25"))
     try:
         with smtplib.SMTP(host, port, timeout=15) as s:
-            s.send_message(msg)
+            s.send_message(msg, from_addr=os.getenv("MAIL_ENVELOPE_FROM") or mail_from())
         return True
     except Exception as e:
         # адрес в журнал не пишем
