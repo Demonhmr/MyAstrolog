@@ -23,8 +23,9 @@ const exe = require('os').homedir() + '/.cache/ms-playwright/chromium-1134/chrom
   ok(await page.isVisible('#e-date'), 'ошибка даты при пустой форме');
 
   await page.fill('#f-date', '');
-  await page.type('#f-date', '15011990');
-  ok((await page.inputValue('#f-date')) === '15.01.1990', 'маска даты ставит точки');
+  const DATE = process.env.E2E_DATE || '15011990';   // другая дата — другое сочетание (проверка подмены текста)
+  await page.type('#f-date', DATE);
+  ok((await page.inputValue('#f-date')) === DATE.slice(0, 2) + '.' + DATE.slice(2, 4) + '.' + DATE.slice(4), 'маска даты ставит точки');
   await page.fill('#f-time', '14:30');
 
   await page.fill('#f-birth-q', 'Березники');
@@ -47,7 +48,12 @@ const exe = require('os').homedir() + '/.cache/ms-playwright/chromium-1134/chrom
   await page.waitForSelector('[data-screen=month]:not([hidden])');
   await page.waitForFunction(() => document.querySelector('#m-dates').textContent.includes('—'), null, { timeout: 15000 });
   ok(true, 'прогноз: ' + await page.textContent('#m-dates') + ' | ' + await page.textContent('#m-role-title') + ' | ' + await page.textContent('#m-task-title'));
-  ok((await page.$$('#m-story h3')).length >= 2, 'текст «как хочешь / как будет» из справочника');
+  const live = !!(await page.$('#m-story[data-source=llm]')), dict = !live && (await page.$$('#m-story h3')).length >= 2;
+  ok(dict || live, 'текст «как хочешь / как будет»: ' + (live ? 'нейросеть (из кэша)' : 'справочник'));
+  if (dict && await page.isVisible('#m-story-note')) {
+    await page.waitForSelector('#m-story[data-source=llm]', { timeout: 60000 });
+    ok(await page.isHidden('#m-story-note') && (await page.textContent('#m-story')).length > 1000, 'справочник подменён живым текстом нейросети');
+  }
   await page.waitForSelector('#m-chart:not([hidden])', { timeout: 20000 });
   ok(true, 'карта нарисована');
   ok(await page.isHidden('#m-reminder'), 'в браузере переключателя напоминания нет');
@@ -82,7 +88,7 @@ const exe = require('os').homedir() + '/.cache/ms-playwright/chromium-1134/chrom
   await ctx.setOffline(false);
 
   await page.goto(BASE + '#settings');
-  ok((await page.textContent('#s-facts')).includes('15.01.1990'), 'настройки показывают данные');
+  ok((await page.textContent('#s-facts')).includes(DATE.slice(0, 2) + '.' + DATE.slice(2, 4) + '.' + DATE.slice(4)), 'настройки показывают данные');
   await page.screenshot({ path: OUT + '/05-settings.png', fullPage: true });
   page.once('dialog', d => d.accept());
   await page.click('#s-erase');

@@ -11,3 +11,6 @@ venv/
 # База Звездицы
 storage/
 *.db
+
+# ключ polza.ai (LLM)
+plati_key*.txt

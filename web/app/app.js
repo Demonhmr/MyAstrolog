@@ -63,9 +63,9 @@
   var auth = store.get(KEY.auth);          // {token, email}
   var cfg = null;                          // /api/config: тарифы, платный ли доступ, аккаунт
 
-  function api(method, path, body, raw) {
+  function api(method, path, body, raw, timeoutMs) {
     var ctrl = ('AbortController' in window) ? new AbortController() : null;
-    var timer = ctrl && setTimeout(function () { ctrl.abort(); }, 25000);
+    var timer = ctrl && setTimeout(function () { ctrl.abort(); }, timeoutMs || 25000);
     var headers = body ? { 'Content-Type': 'application/json' } : {};
     if (auth && auth.token) headers.Authorization = 'Bearer ' + auth.token;
     return fetch(API + path, {
@@ -339,6 +339,7 @@
       }
       renderAny(rep, false);
       if (!rep.locked) loadChart(at);
+      if (!rep.locked && rep.story_pending) loadStory(at, key, rep);
       loadPeriods();
     }, function (e) {
       if (e.offline && !at && cached && cached.key === profileKey()) {
@@ -352,6 +353,23 @@
         if (e.status === 409 && auth) location.hash = '#form';
       }
     }).finally(function () { body.setAttribute('aria-busy', 'false'); });
+  }
+
+  // Живой текст нейросети: прогноз уже показан со справочником, текст подменяем, когда придёт
+  function loadStory(at, key, rep) {
+    var note = $('#m-story-note');
+    if (note) note.hidden = false;
+    api('POST', '/story', requestBody(at), false, 60000).then(function (r) {
+      if (!r.story || loadedKey !== key) return;
+      rep.story = r.story; delete rep.story_pending;
+      renderStory(rep);
+      var last = store.get(KEY.last);
+      if (last && last.key === profileKey() && last.report.cycle.start_utc === rep.cycle.start_utc) {
+        store.set(KEY.last, { key: last.key, report: rep, saved: last.saved });
+      }
+    }, function () { /* остаётся справочник */ }).finally(function () {
+      if (note && loadedKey === key) note.hidden = true;
+    });
   }
 
   function cycleLabel(rep) {
@@ -410,6 +428,41 @@
     $('#m-offline').hidden = true;
   }
 
+  function renderStory(rep) {
+    var note = $('#m-story-note');
+    if (note) note.hidden = true;
+    var story = $('#m-story'); story.innerHTML = '';
+    story.setAttribute('data-source', rep.story.source);
+    if (rep.story.source === 'llm') {
+      // Текст нейросети сервер уже экранировал; разрешаем только <b>. Раскладываем в ту же
+      // разметку, что и справочник: строка целиком в <b> — заголовок, строки с «—» — список.
+      var clean = function (s) { return s.replace(/<(?!\/?b>)/g, '&lt;'); };
+      String(rep.story.text).split(/\n{2,}/).forEach(function (block) {
+        var box = h('div'), ul = null, p = null;
+        block.split('\n').forEach(function (line) {
+          line = line.trim();
+          if (!line) return;
+          var head = line.match(/^<b>(.*)<\/b>$/);
+          if (head) { var t = h('h3'); t.innerHTML = clean(head[1]); box.appendChild(t); ul = p = null; return; }
+          if (/^[—–-]\s/.test(line)) {
+            if (!ul) { ul = h('ul'); box.appendChild(ul); p = null; }
+            var li = h('li'); li.innerHTML = clean(line.replace(/^[—–-]\s+/, '')); ul.appendChild(li); return;
+          }
+          if (!p) { p = h('p'); box.appendChild(p); ul = null; } else p.appendChild(document.createElement('br'));
+          p.insertAdjacentHTML('beforeend', clean(line));
+        });
+        if (box.childNodes.length) story.appendChild(box);
+      });
+    } else {
+      rep.story.sections.forEach(function (s) {
+        var box = h('div', null, h('h3', { text: s.title }));
+        if (s.items) { var ul = h('ul'); s.items.forEach(function (i) { ul.appendChild(h('li', { text: i })); }); box.appendChild(ul); }
+        if (s.text) box.appendChild(h('p', { text: s.text }));
+        story.appendChild(box);
+      });
+    }
+  }
+
   function renderMonth(rep, fromCache) {
     renderHero(rep);
     $('#m-body').hidden = false;
@@ -423,20 +476,7 @@
     $('#m-inner').textContent = rep.climate.inner;
     $('#m-outer').textContent = rep.climate.outer;
 
-    var story = $('#m-story'); story.innerHTML = '';
-    if (rep.story.source === 'llm') {
-      // текст нейросети сервер уже экранировал, разрешаем только <b>
-      var safe = h('div', { class: 'stack' });
-      safe.innerHTML = String(rep.story.text).replace(/<(?!\/?b>)/g, '&lt;').replace(/\n/g, '<br>');
-      story.appendChild(safe);
-    } else {
-      rep.story.sections.forEach(function (s) {
-        var box = h('div', null, h('h3', { text: s.title }));
-        if (s.items) { var ul = h('ul'); s.items.forEach(function (i) { ul.appendChild(h('li', { text: i })); }); box.appendChild(ul); }
-        if (s.text) box.appendChild(h('p', { text: s.text }));
-        story.appendChild(box);
-      });
-    }
+    renderStory(rep);
 
     var dyn = $('#m-dyn'); dyn.innerHTML = '';
     [['Начало месяца', rep.dynamics.start], ['Финал месяца', rep.dynamics.end]].forEach(function (p) {

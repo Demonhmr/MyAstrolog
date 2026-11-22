@@ -4,7 +4,9 @@ llm.py — живой текст прогноза через OpenAI-совмес
 Настройки (.env):
   LLM_API_KEY   — ключ; без него бот работает на текстах из справочника
   LLM_MODEL     — модель, по умолчанию anthropic/claude-sonnet-5.5
-  LLM_BASE_URL  — по умолчанию https://openrouter.ai/api/v1
+  LLM_BASE_URL  — по умолчанию https://openrouter.ai/api/v1 (у нас — https://api.polza.ai/api/v1)
+  LLM_REASONING — on: разрешить модели «думать» перед ответом. По умолчанию выключено:
+                  рассуждения дороже, а у Qwen съедают весь max_tokens и ответ приходит пустым
 """
 
 import html
@@ -44,6 +46,16 @@ def is_configured() -> bool:
     return bool(os.getenv("LLM_API_KEY"))
 
 
+def story_key(el_s, cr_s, el_h, cr_h, synth_sign, synth_house) -> str:
+    """Сочетание, от которого зависит промпт. Персональных данных в нём нет,
+    поэтому готовый текст можно хранить общим для всех с тем же сочетанием."""
+    return "|".join(str(x) for x in (el_s, cr_s, el_h, cr_h, synth_sign, synth_house))
+
+
+def model() -> str:
+    return os.getenv("LLM_MODEL", DEFAULT_MODEL)
+
+
 def to_telegram_html(text: str) -> str:
     """Экранирует ответ модели и выделяет заголовки разделов."""
     t = text.strip()
@@ -71,10 +83,8 @@ async def write_story(user_prompt: str) -> Optional[str]:
     if not key:
         return None
     base = os.getenv("LLM_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
-    model = os.getenv("LLM_MODEL", DEFAULT_MODEL)
-
     payload = {
-        "model": model,
+        "model": model(),
         "temperature": 0.8,
         "max_tokens": 2000,
         "messages": [
@@ -82,6 +92,8 @@ async def write_story(user_prompt: str) -> Optional[str]:
             {"role": "user", "content": user_prompt},
         ],
     }
+    if os.getenv("LLM_REASONING", "").lower() not in ("1", "on", "true", "yes"):
+        payload["reasoning"] = {"enabled": False}
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",

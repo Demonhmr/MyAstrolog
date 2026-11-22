@@ -14,6 +14,7 @@ api/app.py — сервер приложения Звездицы (zvezditsa.ru/
   DELETE /api/account                 удалить аккаунт и всё, что с ним связано
   PUT  /api/profile                   данные рождения (после оплаты — только «где сейчас»)
   POST /api/forecast                  прогноз на личный месяц (или «закрыт» с датами)
+  POST /api/story                     живой текст нейросети к прогнозу (если story_pending)
   POST /api/chart                     картинка карты (PNG)
   POST /api/periods                   личные месяцы с доступом: прошлый, текущий, будущие
   POST /api/cycles {from, to}         границы личных месяцев за период (для дневника)
@@ -47,11 +48,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field, field_validator
 
-from core import geocoder, mailer, periods, plans, robokassa, storage, webstore
+from core import geocoder, llm, mailer, periods, plans, robokassa, storage, webstore
 from core.astrology import utcnow_naive
 from core.chart_generator import generate_chart_png
 from core.forecast import Forecast, build_forecast
-from core.interpretator import DATA_DIR
+from core.interpretator import DATA_DIR, ReportInterpretator
 from core.report import build_report
 from core.storage import Profile
 from core.texts import fmt_date, fmt_dt
@@ -63,6 +64,7 @@ UNKNOWN_TIME = "12:00"
 CONSENT_VERSION = "web-v2-2026-11-21"   # редакция согласия для аккаунта (landing/consent.html)
 
 _interp_data = json.loads((DATA_DIR / "interpretations" / "interpretations.json").read_text("utf-8"))
+_interp = ReportInterpretator()
 
 app = FastAPI(title="Звездица API", version=API_VERSION, docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -517,14 +519,88 @@ async def forecast(request: Request, body: ForecastIn):
     if owner and st == periods.PAID:
         snap = webstore.cached_report(owner, cyc.start, key)
         if snap:
-            return {**snap, "access": access}
-    # момент внутри месяца: середина — не зависит от секундных расхождений границ
-    mid = cyc.start + (cyc.end - cyc.start) / 2
-    f = await _forecast(prof, mid)
+            return {**_with_story(snap), "access": access}
+    f = await _forecast(prof, _mid(cyc))
     rep = build_report(f, _interp_data)
+    rep["story_key"] = _story_key(f)
     if owner and st == periods.PAID:
         webstore.save_report(owner, cyc.start, key, rep)
-    return {**rep, "access": access}
+    return {**_with_story(rep), "access": access}
+
+
+# ── Живой текст нейросети ─────────────────────────────────────────────────────
+# Промпт зависит только от сочетания стихий, крестов, знака и дома (без ПД),
+# поэтому текст пишется один раз на сочетание и хранится общим (webstore.llm_stories).
+# /api/forecast отдаёт готовый текст или справочник с story_pending — тогда
+# приложение просит /api/story и подменяет текст, не задерживая показ прогноза.
+
+_story_jobs: dict = {}          # key → asyncio.Task: одно сочетание пишется один раз
+
+
+def _mid(cyc) -> datetime:
+    # момент внутри месяца: середина — не зависит от секундных расхождений границ
+    return cyc.start + (cyc.end - cyc.start) / 2
+
+
+def _story_key(f: Forecast) -> str:
+    return llm.story_key(f.el_s, f.cr_s, f.el_h, f.cr_h, f.synth_sign, f.synth_house)
+
+
+def _llm_daily_limit() -> int:
+    try:
+        return int(os.getenv("LLM_WEB_DAILY", "300"))
+    except ValueError:
+        return 300
+
+
+def _with_story(rep: dict) -> dict:
+    key = rep.get("story_key")
+    if not key or rep["story"].get("source") == "llm":
+        return rep
+    text = webstore.llm_story(key)
+    if text:
+        return {**rep, "story": {"source": "llm", "text": text}}
+    if llm.is_configured() and _llm_daily_limit() > 0:
+        return {**rep, "story_pending": True}
+    return rep
+
+
+async def _write_story(key: str, f: Forecast) -> Optional[str]:
+    text = await asyncio.to_thread(webstore.llm_story, key)
+    if text:
+        return text
+    since = utcnow_naive() - timedelta(days=1)
+    if await asyncio.to_thread(webstore.llm_stories_since, since) >= _llm_daily_limit():
+        logger.warning("LLM daily limit reached")
+        return None
+    prompt = _interp.generate_llm_prompt((f.el_s, f.cr_s), (f.el_h, f.cr_h), f.synth_sign, f.synth_house)
+    text = await llm.write_story(prompt)
+    if text:
+        await asyncio.to_thread(webstore.save_llm_story, key, llm.model(), text)
+    return text
+
+
+@app.post("/api/story")
+async def story(request: Request, body: ForecastIn):
+    acc, prof, cyc, st = await _gate(request, body)
+    if st not in periods.ACCESSIBLE:
+        raise HTTPException(402, "Этот личный месяц закрыт")
+    if not llm.is_configured():
+        return {"story": None}
+    f = await _forecast(prof, _mid(cyc))
+    key = _story_key(f)
+    job = _story_jobs.get(key)
+    if job is None:
+        job = asyncio.ensure_future(_write_story(key, f))
+        _story_jobs[key] = job
+        job.add_done_callback(lambda _j, k=key: _story_jobs.pop(k, None))
+    try:
+        # shield: обрыв связи у одного клиента не отменяет текст для остальных
+        text = await asyncio.shield(job)
+    except Exception:
+        logger.exception("story failed")
+        text = None
+    return {"story": {"source": "llm", "text": text} if text else None}
 
 
 _chart_cache = LRU(200)

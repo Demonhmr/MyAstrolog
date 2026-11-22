@@ -7,6 +7,7 @@ webstore.py — хранилище сайта и общих для сайта и
   orders        — счета Robokassa (номер счёта = InvId)
   diary         — дневник «дата — запись» (owner как у grants)
   report_cache  — снимок открытого платного прогноза: месяц не меняется задним числом
+  llm_stories   — тексты нейросети по сочетанию (llm.story_key), общие для всех: без ПД
 
 Время везде — UTC, строки ISO «ГГГГ-ММ-ДДTЧЧ:ММ:СС». Деньги — в копейках.
 """
@@ -112,6 +113,13 @@ CREATE TABLE IF NOT EXISTS report_cache (
     report       TEXT NOT NULL,
     created_at   TEXT NOT NULL,
     PRIMARY KEY (owner, cycle_start)
+);
+
+CREATE TABLE IF NOT EXISTS llm_stories (
+    key         TEXT PRIMARY KEY,
+    model       TEXT NOT NULL,
+    text        TEXT NOT NULL,
+    created_at  TEXT NOT NULL
 );
 """
 
@@ -455,3 +463,23 @@ def save_report(owner: str, cycle_start: datetime, place_key: str, report: dict)
         c.execute("INSERT INTO report_cache (owner, cycle_start, place_key, report, created_at) VALUES (?, ?, ?, ?, ?)",
                   (owner, _iso(cycle_start), place_key, json.dumps(report, ensure_ascii=False), _now()))
         c.commit()
+
+
+# ── Тексты нейросети (общие по сочетанию, без персональных данных) ───────────
+
+def llm_story(key: str) -> Optional[str]:
+    with closing(_conn()) as c:
+        r = c.execute("SELECT text FROM llm_stories WHERE key = ?", (key,)).fetchone()
+    return r["text"] if r else None
+
+
+def save_llm_story(key: str, model: str, text: str) -> None:
+    with closing(_conn()) as c:
+        c.execute("INSERT OR REPLACE INTO llm_stories (key, model, text, created_at) VALUES (?, ?, ?, ?)",
+                  (key, model, text, _now()))
+        c.commit()
+
+
+def llm_stories_since(since: datetime) -> int:
+    with closing(_conn()) as c:
+        return c.execute("SELECT COUNT(*) FROM llm_stories WHERE created_at >= ?", (_iso(since),)).fetchone()[0]

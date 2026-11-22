@@ -39,9 +39,11 @@ Telegram-бот, личный астролог. Считает **личный м
 | Переменная | Описание |
 |---|---|
 | `BOT_TOKEN` | токен бота от @BotFather (обязательно) |
-| `LLM_API_KEY` | ключ OpenRouter для живого текста; без него — справочник |
-| `LLM_MODEL` | модель, по умолчанию `anthropic/claude-sonnet-5.5` |
-| `LLM_BASE_URL` | OpenAI-совместимый API, по умолчанию OpenRouter |
+| `LLM_API_KEY` | ключ OpenAI-совместимого API (у нас polza.ai) для живого текста в боте и на сайте; без него — справочник |
+| `LLM_MODEL` | модель; на проде `qwen/qwen3.8-flash` (≈0,1 ₽ за текст), по умолчанию в коде `anthropic/claude-sonnet-5.5` |
+| `LLM_BASE_URL` | адрес API; на проде `https://api.polza.ai/api/v1`, по умолчанию OpenRouter |
+| `LLM_REASONING` | `on` — разрешить «рассуждения» модели; по умолчанию выключены |
+| `LLM_WEB_DAILY` | сайт: лимит новых текстов в сутки, по умолчанию 300; тексты общие по сочетанию стихий/знака/дома |
 | `PAYWALL_ENABLED` | `true` — без подписки только короткий прогноз, в /premium кнопки оплаты; по умолчанию `false` |
 | `PRICE_MONTH_STARS`, `PRICE_YEAR_STARS` | цены в звёздах, по умолчанию 200 и 1700 |
 | `SUPPORT_CONTACT` | контакт для /paysupport |
